@@ -1,0 +1,38 @@
+{
+  "schema_version": "scenario-v1",
+  "id": "database-busy",
+  "title": "Database busy rolls back the completed run",
+  "provider_fixture": "virtual-fault-plan-v1",
+  "ai_fixture": "virtual-classification-v1",
+  "max_provider_calls": 7,
+  "fault_plan": [
+    {
+      "target": "database_save",
+      "events": ["database_busy"]
+    }
+  ],
+  "steps": [
+    {"action": "import_securities", "value": "AAPL, AMD, IREN"},
+    {"action": "create_watchlist", "value": "Database Busy"},
+    {"action": "add_all_classified"},
+    {
+      "action": "run",
+      "benchmark": "SPY.US",
+      "end_date": "2026-07-24",
+      "ranges": ["3M"]
+    }
+  ],
+  "expected": {
+    "operation_terminal": "FAILED",
+    "run_status": "FAILED",
+    "run_error_code": "HISTORY_SAVE_FAILED",
+    "database_busy_count": 1,
+    "writes_before_fault": 1,
+    "history_count": 0,
+    "history_delta": 0,
+    "provider_call_count": 7,
+    "provider_calls_after_terminal": 7,
+    "persisted_run_rows": 0,
+    "persisted_analysis_rows": 0
+  }
+}

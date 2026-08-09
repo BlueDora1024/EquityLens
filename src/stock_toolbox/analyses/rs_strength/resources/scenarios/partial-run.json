@@ -1,0 +1,38 @@
+{
+  "schema_version": "scenario-v1",
+  "id": "partial-run",
+  "title": "Partial member market-data failure",
+  "provider_fixture": "virtual-partial-member-v1",
+  "ai_fixture": "virtual-classification-v1",
+  "max_provider_calls": 24,
+  "steps": [
+    {
+      "action": "bootstrap"
+    },
+    {
+      "action": "import_securities",
+      "value": "IREN, NVDA, AAPL, MSFT, AMD"
+    },
+    {
+      "action": "create_watchlist",
+      "value": "Partial Run"
+    },
+    {
+      "action": "add_all_classified"
+    },
+    {
+      "action": "run",
+      "benchmark": "SPY.US",
+      "end_date": "2026-07-24",
+      "ranges": ["3M", "6M", "1Y"]
+    }
+  ],
+  "expected": {
+    "terminal": "succeeded",
+    "security_count": 5,
+    "watchlist_member_count": 5,
+    "run_status": "PARTIAL",
+    "stock_result_count": 12,
+    "history_count": 1
+  }
+}

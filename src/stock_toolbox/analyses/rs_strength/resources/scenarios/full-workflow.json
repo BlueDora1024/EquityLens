@@ -1,0 +1,42 @@
+{
+  "schema_version": "scenario-v1",
+  "id": "full-workflow",
+  "title": "Complete offline RS workflow",
+  "provider_fixture": "virtual-market-v1",
+  "ai_fixture": "virtual-classification-v1",
+  "max_provider_calls": 20,
+  "steps": [
+    {
+      "action": "bootstrap"
+    },
+    {
+      "action": "import_securities",
+      "value": "IREN, NVDA, AMD, TQQQ, MISSING"
+    },
+    {
+      "action": "create_watchlist",
+      "value": "Tech Leaders"
+    },
+    {
+      "action": "add_all_classified"
+    },
+    {
+      "action": "run",
+      "benchmark": "SPY.US",
+      "end_date": "2026-07-24",
+      "ranges": ["3M", "6M", "1Y"]
+    },
+    {
+      "action": "export_latest",
+      "formats": ["json", "markdown", "csv"]
+    }
+  ],
+  "expected": {
+    "terminal": "succeeded",
+    "security_count": 3,
+    "watchlist_member_count": 3,
+    "run_status": "READY",
+    "stock_result_count": 9,
+    "history_count": 1
+  }
+}

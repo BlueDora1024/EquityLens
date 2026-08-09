@@ -1,0 +1,35 @@
+{
+  "schema_version": "scenario-v1",
+  "id": "auth-fatal",
+  "title": "Authentication failure stops new provider work",
+  "provider_fixture": "virtual-fault-plan-v1",
+  "ai_fixture": "virtual-classification-v1",
+  "max_provider_calls": 7,
+  "fault_plan": [
+    {
+      "target": "daily",
+      "symbol": "AAPL.US",
+      "events": ["authentication_failed"]
+    }
+  ],
+  "steps": [
+    {"action": "import_securities", "value": "AAPL, AMD, IREN, MSFT, NVDA"},
+    {"action": "create_watchlist", "value": "Authentication Fatal"},
+    {"action": "add_all_classified"},
+    {
+      "action": "run",
+      "benchmark": "SPY.US",
+      "end_date": "2026-07-24",
+      "ranges": ["3M"]
+    }
+  ],
+  "expected": {
+    "operation_terminal": "FAILED",
+    "run_status": "FAILED",
+    "history_count": 0,
+    "history_delta": 0,
+    "provider_call_count": 7,
+    "provider_calls_after_terminal": 7,
+    "unexecuted_symbols": ["AMD.US", "IREN.US", "MSFT.US", "NVDA.US"]
+  }
+}

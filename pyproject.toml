@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools==80.9.0", "wheel==0.46.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "equitylens"
+version = "1.0.0"
+description = "Local-first macOS equity analysis and market review desktop application"
+readme = "README.md"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "futu-api==10.9.6908",
+  "httpx==0.28.1",
+  "longbridge==4.4.1",
+  "PySide6==6.11.1",
+  "pydantic==2.13.4",
+  "socksio==1.0.0",
+  "yfinance==1.2.1",
+]
+
+[project.optional-dependencies]
+dev = [
+  "mypy==2.3.0",
+  "pytest==9.1.1",
+  "pytest-qt==4.5.0",
+  "pyinstaller==6.21.0",
+  "ruff==0.16.0",
+]
+
+[project.scripts]
+equitylens = "stock_toolbox.cli:main"
+equitylens-gui = "stock_toolbox.gui:main"
+stock-toolbox = "stock_toolbox.cli:main"
+stock-toolbox-gui = "stock_toolbox.gui:main"
+rs-radar-cli = "rs_radar.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+stock_toolbox = [
+  "desktop/resources/*.png",
+  "desktop_qml/qml/*.qml",
+  "desktop_qml/qml/components/*.qml",
+  "desktop_qml/qml/qmldir",
+  "analyses/rs_strength/resources/*.png",
+  "analyses/rs_strength/resources/scenarios/*.json",
+  "infrastructure/persistence/sql/*.sql",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-ra"
+pythonpath = [".", "src"]
+markers = [
+  "fast: deterministic inner-loop contract tests",
+  "live: explicit network tests that may consume provider resources",
+  "package: packaged application acceptance tests",
+  "qml_app: real QML engine and window geometry tests, isolated by process",
+]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.mypy]
+python_version = "3.12"
+strict = true
+packages = ["stock_toolbox", "rs_radar"]

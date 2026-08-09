@@ -1,0 +1,12 @@
+.DS_Store
+.idea/
+.pytest_cache/
+.superpowers/
+.worktrees/
+.venv/
+__pycache__/
+artifacts/
+build/
+dist/
+*.pyc
+*.egg-info/

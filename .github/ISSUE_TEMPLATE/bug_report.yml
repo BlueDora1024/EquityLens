@@ -1,0 +1,31 @@
+name: Bug report
+description: Report reproducible EquityLens behavior
+title: "[Bug]: "
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not include API keys, OAuth tokens, account data, or unredacted logs.
+  - type: input
+    id: version
+    attributes:
+      label: EquityLens version and Mac architecture
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Reproduction steps
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected and actual behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: provider
+    attributes:
+      label: Provider
+      options: [Longbridge, Futu, Yahoo fallback, Mock, Not applicable]

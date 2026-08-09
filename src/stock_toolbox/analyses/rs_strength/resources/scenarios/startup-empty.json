@@ -1,0 +1,16 @@
+{
+  "schema_version": "scenario-v1",
+  "id": "startup-empty",
+  "title": "Empty startup",
+  "provider_fixture": "empty-v1",
+  "ai_fixture": "disabled-v1",
+  "max_provider_calls": 0,
+  "steps": [
+    {
+      "action": "bootstrap"
+    }
+  ],
+  "expected": {
+    "terminal": "succeeded"
+  }
+}

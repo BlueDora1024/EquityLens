@@ -1,0 +1,35 @@
+{
+  "schema_version": "scenario-v1",
+  "id": "timeout-recovery",
+  "title": "Timeout retry recovers without duplicate work",
+  "provider_fixture": "virtual-fault-plan-v1",
+  "ai_fixture": "virtual-classification-v1",
+  "max_provider_calls": 8,
+  "fault_plan": [
+    {
+      "target": "daily",
+      "symbol": "AAPL.US",
+      "events": ["timeout", "ok"]
+    }
+  ],
+  "steps": [
+    {"action": "import_securities", "value": "AAPL, AMD, IREN"},
+    {"action": "create_watchlist", "value": "Timeout Recovery"},
+    {"action": "add_all_classified"},
+    {
+      "action": "run",
+      "benchmark": "SPY.US",
+      "end_date": "2026-07-24",
+      "ranges": ["3M"]
+    }
+  ],
+  "expected": {
+    "operation_terminal": "SUCCEEDED",
+    "run_status": "READY",
+    "history_count": 1,
+    "history_delta": 1,
+    "provider_call_count": 8,
+    "provider_calls_after_terminal": 8,
+    "feedback_kinds": ["retrying", "recovered"]
+  }
+}

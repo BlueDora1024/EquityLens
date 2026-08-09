@@ -1,0 +1,24 @@
+{
+  "schema_version": "scenario-v1",
+  "id": "rs-benchmark-v1",
+  "title": "Frozen 600-member RS benchmark",
+  "provider_fixture": "synthetic-spy-v1",
+  "ai_fixture": "disabled-v1",
+  "max_provider_calls": 0,
+  "steps": [
+    {
+      "action": "run_rs_benchmark"
+    }
+  ],
+  "expected": {
+    "terminal": "succeeded",
+    "watchlist_member_count": 600,
+    "run_status": "READY",
+    "stock_result_count": 1800,
+    "classification_result_count": 60,
+    "session_count": 252,
+    "canonical_bytes": 792434,
+    "canonical_sha256": "6ad2505299e01cc3b78d605982059b2917ea88b30c430d171d3a05fca05386a9",
+    "history_count": 0
+  }
+}

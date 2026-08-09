@@ -1,0 +1,39 @@
+{
+  "schema_version": "scenario-v1",
+  "id": "ai-old-report",
+  "title": "AI failure preserves the previous report",
+  "provider_fixture": "virtual-fault-plan-v1",
+  "ai_fixture": "virtual-report-failure-v1",
+  "max_provider_calls": 7,
+  "fault_plan": [
+    {
+      "target": "ai_report",
+      "events": ["service_unavailable"]
+    }
+  ],
+  "steps": [
+    {"action": "import_securities", "value": "AAPL, AMD, IREN"},
+    {"action": "create_watchlist", "value": "AI Old Report"},
+    {"action": "add_all_classified"},
+    {
+      "action": "run",
+      "benchmark": "SPY.US",
+      "end_date": "2026-07-24",
+      "ranges": ["3M"]
+    },
+    {"action": "generate_rs_report_twice"}
+  ],
+  "expected": {
+    "operation_terminal": "SUCCEEDED",
+    "run_status": "READY",
+    "history_count": 1,
+    "history_delta": 1,
+    "provider_call_count": 7,
+    "provider_calls_after_terminal": 7,
+    "report_error": "service_unavailable",
+    "report_call_count": 2,
+    "old_report_preserved": true,
+    "history_count_before_fault": 1,
+    "history_count_after_fault": 1
+  }
+}

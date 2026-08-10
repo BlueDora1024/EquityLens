@@ -4,7 +4,7 @@ from datetime import date
 from threading import Event
 
 import pytest
-from PySide6.QtCore import QMetaObject, QObject, QPoint, QPointF, Qt
+from PySide6.QtCore import Q_ARG, QMetaObject, QObject, QPoint, QPointF, Qt
 from PySide6.QtGui import QWindow
 from PySide6.QtTest import QTest
 
@@ -536,6 +536,114 @@ def test_watchlist_overlay_keeps_open_candidate_snapshot_during_bridge_refresh(
     assert len(overlay.property("selectedIds").toVariant()) == 124
     assert len(visible_lists) == 1
     assert visible_lists[0].property("count") == 124
+
+
+def test_watchlist_overlay_preserves_scroll_when_a_binding_changes(
+    qapp,
+    scenario_application,
+) -> None:
+    engine = build_pilot_engine(
+        scenario_application,
+        RuntimeEnvironment.SCENARIO,
+    )
+    window = engine.rootObjects()[0]
+    window.resize(1280, 800)
+    window.show()
+    overlay = window.findChild(QObject, "watchlistMemberOverlay")
+    candidates = [
+        {
+            "id": f"security-{index}",
+            "displaySymbol": f"TEST{index}",
+            "name": f"测试证券 {index}",
+            "classifications": [
+                {"bindingId": "tag-a", "name": "标签 A"},
+                {"bindingId": "tag-b", "name": "标签 B"},
+            ],
+        }
+        for index in range(40)
+    ]
+
+    overlay.setProperty("candidates", candidates)
+    overlay.setProperty("visible", True)
+    QTest.qWait(20)
+    assert QMetaObject.invokeMethod(overlay, "toggleAllVisible") is True
+    assert QMetaObject.invokeMethod(overlay, "prepareSelections") is True
+    QTest.qWait(40)
+    selection_list = next(
+        item
+        for item in overlay.findChildren(QObject)
+        if item.metaObject().className() == "QQuickListView"
+        and item.property("visible") is True
+        and item.property("count") == 40
+    )
+    assert selection_list.setProperty("contentY", 600.0)
+
+    assert QMetaObject.invokeMethod(
+        overlay,
+        "changeBinding",
+        Q_ARG("QVariant", "security-30"),
+        Q_ARG("QVariant", "tag-b"),
+    ) is True
+    QTest.qWait(40)
+
+    assert float(selection_list.property("contentY")) == pytest.approx(600.0)
+    assert overlay.property("selections").toVariant()[30]["bindingId"] == "tag-b"
+
+
+def test_watchlist_page_preserves_scroll_when_a_member_binding_changes(
+    qapp,
+    scenario_application,
+) -> None:
+    scenario_application.import_securities(
+        ",".join(f"TEST{index:03d}" for index in range(40))
+    )
+    extra = scenario_application.master_data.create_classification("第二标签")
+    memberships: list[tuple[str, str]] = []
+    replacement_by_security: dict[str, str] = {}
+    for security in scenario_application.master_data.list_securities():
+        updated = scenario_application.master_data.set_security_classifications(
+            security.id,
+            (security.bindings[0].classification_id, extra.id),
+        )
+        memberships.append((updated.id, updated.bindings[0].id))
+        replacement_by_security[updated.id] = updated.bindings[1].id
+    watchlist = scenario_application.master_data.create_watchlist("滚动回归")
+    scenario_application.master_data.add_watchlist_members(
+        watchlist.id,
+        tuple(memberships),
+    )
+
+    engine = build_pilot_engine(
+        scenario_application,
+        RuntimeEnvironment.SCENARIO,
+    )
+    window = engine.rootObjects()[0]
+    shell = engine.rootContext().contextProperty("shellBridge")
+    bridge = engine.rootContext().contextProperty("masterDataBridge")
+    page = window.findChild(QObject, "masterDataPage")
+    member_list = window.findChild(QObject, "watchlistMemberList")
+    shell.navigate("watchlists")
+    bridge.select_watchlist(watchlist.id)
+    page.setProperty(
+        "selectedEntity",
+        {"id": watchlist.id, "name": watchlist.display_name, "memberCount": 40},
+    )
+    window.resize(1280, 800)
+    window.show()
+    QTest.qWait(80)
+    assert member_list.property("count") == 40
+    assert member_list.setProperty("contentY", 600.0)
+    target_id = memberships[30][0]
+
+    assert QMetaObject.invokeMethod(
+        page,
+        "updateSelectedWatchlistBinding",
+        Q_ARG("QVariant", target_id),
+        Q_ARG("QVariant", replacement_by_security[target_id]),
+    ) is True
+    QTest.qWait(80)
+
+    assert float(member_list.property("contentY")) == pytest.approx(600.0)
 
 
 def test_import_progress_animates_between_stage_targets(

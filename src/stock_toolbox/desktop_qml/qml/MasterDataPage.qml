@@ -101,6 +101,25 @@ Item {
         })
     }
 
+    function updateSelectedWatchlistBinding(securityId, bindingId) {
+        const scrollPosition = entityMemberList.contentY
+        // qmllint disable unqualified
+        const updated = masterDataBridge.update_watchlist_member_binding(
+            masterDataBridge.selected_watchlist_id,
+            securityId,
+            bindingId)
+        // qmllint enable unqualified
+        if (updated) {
+            Qt.callLater(function() {
+                const maximum = Math.max(0,
+                    entityMemberList.contentHeight - entityMemberList.height)
+                entityMemberList.contentY = Math.max(0,
+                    Math.min(scrollPosition, maximum))
+            })
+        }
+        return updated
+    }
+
     ColumnLayout {
         anchors.fill: parent
         spacing: 14
@@ -868,6 +887,7 @@ Item {
 
                         ListView {
                             id: entityMemberList
+                            objectName: "watchlistMemberList"
                             Layout.fillWidth: true
                             Layout.fillHeight: true
                             clip: true
@@ -937,14 +957,9 @@ Item {
                                         valueText: poolMember.modelData
                                             .classification || ""
                                         onActivated: {
-                                            // qmllint disable unqualified
-                                            masterDataBridge
-                                                .update_watchlist_member_binding(
-                                                    masterDataBridge
-                                                        .selected_watchlist_id,
-                                                    poolMember.modelData.securityId,
-                                                    currentValue)
-                                            // qmllint enable unqualified
+                                            page.updateSelectedWatchlistBinding(
+                                                poolMember.modelData.securityId,
+                                                currentValue)
                                         }
                                     }
                                     GlassButton {

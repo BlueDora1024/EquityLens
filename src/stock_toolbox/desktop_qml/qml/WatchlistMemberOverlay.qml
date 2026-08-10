@@ -84,8 +84,11 @@ Item {
     }
 
     function changeBinding(securityId, bindingId) {
-        selections = selections.map(item => item.securityId === securityId
-            ? Object.assign({}, item, {bindingId: bindingId}) : item)
+        const selection = selections.find(
+            item => item.securityId === securityId)
+        if (selection) {
+            selection.bindingId = bindingId
+        }
     }
 
     function bindingName(selection) {

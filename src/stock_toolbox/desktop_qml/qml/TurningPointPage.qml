@@ -21,6 +21,8 @@ Item {
     property bool reportDialogOpen: false
     property string visibleRunId: ""
     // qmllint disable unqualified
+    readonly property bool hasSelectedHistory:
+        turningPointBridge.selected_run_id.length > 0
     readonly property string reportErrorText:
         turningPointBridge.report_error
     readonly property bool modalOverlayOpen:
@@ -608,70 +610,83 @@ Item {
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
                     }
-                    ListView {
+                    Item {
                         Layout.fillWidth: true
                         Layout.fillHeight: true
-                        spacing: 7
-                        clip: true
-                        // qmllint disable unqualified
-                        model: turningPointBridge.history
-                        // qmllint enable unqualified
-                        delegate: Rectangle {
-                            id: historyRow
-                            required property var modelData
-                            width: ListView.view.width
-                            height: 82
-                            radius: 13
+
+                        ListView {
+                            id: turningHistoryList
+                            anchors.fill: parent
+                            spacing: 7
+                            clip: true
                             // qmllint disable unqualified
-                            color: historyRow.modelData.runId
-                                === turningPointBridge.selected_run_id
-                                ? Theme.accentSoft : Theme.field
+                            model: turningPointBridge.history
                             // qmllint enable unqualified
-                            border.width: 1
-                            // qmllint disable unqualified
-                            border.color: historyRow.modelData.runId
-                                === turningPointBridge.selected_run_id
-                                ? Theme.accent : Theme.hairline
-                            // qmllint enable unqualified
-                            Column {
-                                anchors.left: parent.left
-                                anchors.leftMargin: 12
-                                anchors.verticalCenter: parent.verticalCenter
-                                spacing: 4
-                                Text {
-                                    text: (historyRow.modelData.pinned ? "● " : "")
-                                        + historyRow.modelData.name
-                                    color: Theme.text
-                                    font.pixelSize: 11
-                                    font.weight: Font.Medium
-                                    width: historyRow.width - 24
-                                    elide: Text.ElideRight
+                            delegate: Rectangle {
+                                id: historyRow
+                                required property var modelData
+                                width: ListView.view.width
+                                height: 82
+                                radius: 13
+                                // qmllint disable unqualified
+                                color: historyRow.modelData.runId
+                                    === turningPointBridge.selected_run_id
+                                    ? Theme.accentSoft : Theme.field
+                                // qmllint enable unqualified
+                                border.width: 1
+                                // qmllint disable unqualified
+                                border.color: historyRow.modelData.runId
+                                    === turningPointBridge.selected_run_id
+                                    ? Theme.accent : Theme.hairline
+                                // qmllint enable unqualified
+                                Column {
+                                    anchors.left: parent.left
+                                    anchors.leftMargin: 12
+                                    anchors.verticalCenter: parent.verticalCenter
+                                    spacing: 4
+                                    Text {
+                                        text: (historyRow.modelData.pinned ? "● " : "")
+                                            + historyRow.modelData.name
+                                        color: Theme.text
+                                        font.pixelSize: 11
+                                        font.weight: Font.Medium
+                                        width: historyRow.width - 24
+                                        elide: Text.ElideRight
+                                    }
+                                    Text {
+                                        text: "操作于 "
+                                            + historyRow.modelData.completedAt
+                                        color: Theme.secondaryText
+                                        font.pixelSize: 9
+                                    }
+                                    Text {
+                                        text: "命中 " + historyRow.modelData.matchedCount
+                                            + " / " + historyRow.modelData.totalCount
+                                            + " · " + historyRow.modelData.intervals.length
+                                            + " 周期 · " + historyRow.modelData.provider
+                                        color: Theme.faintText
+                                        font.pixelSize: 9
+                                    }
                                 }
-                                Text {
-                                    text: "操作于 "
-                                        + historyRow.modelData.completedAt
-                                    color: Theme.secondaryText
-                                    font.pixelSize: 9
-                                }
-                                Text {
-                                    text: "命中 " + historyRow.modelData.matchedCount
-                                        + " / " + historyRow.modelData.totalCount
-                                        + " · " + historyRow.modelData.intervals.length
-                                        + " 周期 · " + historyRow.modelData.provider
-                                    color: Theme.faintText
-                                    font.pixelSize: 9
+                                MouseArea {
+                                    anchors.fill: parent
+                                    onClicked: {
+                                        page.exportRunId = historyRow.modelData.runId
+                                        // qmllint disable unqualified
+                                        turningPointBridge.select_run(
+                                            historyRow.modelData.runId)
+                                        // qmllint enable unqualified
+                                    }
                                 }
                             }
-                            MouseArea {
-                                anchors.fill: parent
-                                onClicked: {
-                                    page.exportRunId = historyRow.modelData.runId
-                                    // qmllint disable unqualified
-                                    turningPointBridge.select_run(
-                                        historyRow.modelData.runId)
-                                    // qmllint enable unqualified
-                                }
-                            }
+                        }
+
+                        Text {
+                            anchors.centerIn: parent
+                            visible: turningHistoryList.count === 0
+                            text: "暂无记录"
+                            color: Theme.faintText
+                            font.pixelSize: 11
                         }
                     }
                 }
@@ -687,7 +702,8 @@ Item {
                     spacing: 8
 
                     ColumnLayout {
-                        visible: page.historyMode
+                        objectName: "turningHistoryRecordContent"
+                        visible: page.hasSelectedHistory
                         Layout.fillWidth: true
                         spacing: 7
                         RowLayout {
@@ -1076,9 +1092,36 @@ Item {
                             }
                         }
                     }
+
+                    Item {
+                        objectName: "turningHistoryEmptyState"
+                        visible: !page.hasSelectedHistory
+                        Layout.fillWidth: true
+                        Layout.fillHeight: true
+
+                        Column {
+                            anchors.centerIn: parent
+                            spacing: 7
+
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "暂无拐点筛选记录"
+                                color: Theme.text
+                                font.pixelSize: 14
+                                font.weight: Font.DemiBold
+                            }
+                            Text {
+                                anchors.horizontalCenter: parent.horizontalCenter
+                                text: "完成一次拐点筛选后，结果会显示在这里。"
+                                color: Theme.faintText
+                                font.pixelSize: 11
+                            }
+                        }
+                    }
                     Text {
                         // qmllint disable unqualified
-                        visible: turningPointBridge.results.length === 0
+                        visible: page.hasSelectedHistory
+                            && turningPointBridge.results.length === 0
                         // qmllint enable unqualified
                         Layout.alignment: Qt.AlignHCenter
                         // qmllint disable unqualified

@@ -518,6 +518,17 @@ def test_turning_history_keeps_result_period_filters_inside_detail_panel() -> No
     assert "historyRow.modelData.completedAt" in turning
 
 
+def test_turning_history_uses_a_true_empty_state_without_record_actions() -> None:
+    turning = qml_text("TurningPointPage.qml")
+
+    assert 'objectName: "turningHistoryEmptyState"' in turning
+    assert 'objectName: "turningHistoryRecordContent"' in turning
+    assert "visible: page.hasSelectedHistory" in turning
+    assert "visible: !page.hasSelectedHistory" in turning
+    assert 'text: "暂无拐点筛选记录"' in turning
+    assert 'text: "完成一次拐点筛选后，结果会显示在这里。"' in turning
+
+
 def test_analysis_reports_keep_old_content_visible_with_error_feedback() -> None:
     turning = qml_text("TurningPointPage.qml")
     extreme = qml_text("ExtremeDetailView.qml")

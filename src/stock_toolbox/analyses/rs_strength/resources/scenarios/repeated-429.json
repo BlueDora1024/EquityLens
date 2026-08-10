@@ -1,10 +1,10 @@
 {
   "schema_version": "scenario-v1",
   "id": "repeated-429",
-  "title": "Repeated rate limit opens the run circuit",
+  "title": "Scattered rate limits recover without aborting the batch",
   "provider_fixture": "virtual-fault-plan-v1",
   "ai_fixture": "virtual-classification-v1",
-  "max_provider_calls": 9,
+  "max_provider_calls": 13,
   "fault_plan": [
     {
       "target": "daily",
@@ -14,7 +14,7 @@
     {
       "target": "daily",
       "symbol": "AMD.US",
-      "events": ["rate_limited"]
+      "events": ["rate_limited", "ok"]
     }
   ],
   "steps": [
@@ -29,12 +29,12 @@
     }
   ],
   "expected": {
-    "operation_terminal": "FAILED",
-    "run_status": "FAILED",
-    "history_count": 0,
-    "history_delta": 0,
-    "provider_call_count": 9,
-    "provider_calls_after_terminal": 9,
+    "operation_terminal": "SUCCEEDED",
+    "run_status": "READY",
+    "history_count": 1,
+    "history_delta": 1,
+    "provider_call_count": 13,
+    "provider_calls_after_terminal": 13,
     "attempted_symbols": [
       "AAPL.US",
       "AMD.US",
@@ -44,8 +44,12 @@
       "SPY.US",
       "AAPL.US",
       "AAPL.US",
-      "AMD.US"
+      "AMD.US",
+      "AMD.US",
+      "IREN.US",
+      "MSFT.US",
+      "NVDA.US"
     ],
-    "unexecuted_symbols": ["IREN.US", "MSFT.US", "NVDA.US"]
+    "unexecuted_symbols": []
   }
 }

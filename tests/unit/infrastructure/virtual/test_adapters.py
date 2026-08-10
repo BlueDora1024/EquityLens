@@ -76,7 +76,7 @@ def test_virtual_provider_does_not_advertise_retired_250d_quant() -> None:
     assert "turning-risk-250d-v1" not in VirtualProvider.quant_script_versions
 
 
-def test_second_rate_limit_opens_one_run_circuit_across_requests() -> None:
+def test_scattered_rate_limits_do_not_open_one_run_circuit() -> None:
     provider = VirtualProvider(
         fault_plan=(
             VirtualProviderFault(
@@ -119,26 +119,24 @@ def test_second_rate_limit_opens_one_run_circuit_across_requests() -> None:
     )
 
     assert "AAPL.US" in recovered.series_by_symbol
-    assert stopped.errors == {"AMD.US": "rate_limited"}
-    assert skipped.errors == {"NVDA.US": "circuit_open"}
+    assert "AMD.US" in stopped.series_by_symbol
+    assert "NVDA.US" in skipped.series_by_symbol
     assert provider.attempted_symbols == (
         "AAPL.US",
         "AAPL.US",
         "AMD.US",
+        "AMD.US",
+        "NVDA.US",
         "NVDA.US",
     )
-    assert provider.unexecuted_symbols == ("NVDA.US",)
+    assert provider.unexecuted_symbols == ()
     assert "NVDA.US" in next_run.series_by_symbol
-    assert provider.external_call_count == 4
+    assert provider.external_call_count == 6
 
 
 @pytest.mark.parametrize(
     ("events", "failure_code"),
     (
-        (
-            ("rate_limited", "rate_limited"),
-            FailureCode.RATE_LIMITED,
-        ),
         (
             ("authentication_failed",),
             FailureCode.AUTHENTICATION_FAILED,

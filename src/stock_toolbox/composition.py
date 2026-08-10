@@ -3173,7 +3173,10 @@ def _longbridge_provider(
         async_quote_factory=contexts.async_quote_factory,
         quant_http_factory=contexts.quant_http_factory,
         max_retries=settings.max_retries,
-        quant_request_interval_seconds=0.125,
+        # Direct Quant HTTP calls bypass QuoteContext's SDK-side limiter.
+        # Keep starts at five per second so calendar/snapshot traffic still
+        # has headroom under Longbridge's account-wide quote budget.
+        quant_request_interval_seconds=0.2,
     )
 
 

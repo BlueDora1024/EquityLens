@@ -149,7 +149,7 @@ def test_quant_endpoint_parses_named_series_for_supported_period() -> None:
     assert http.calls[0][2]["exclude_chart"] is False
 
 
-def test_quant_request_starts_are_paced_below_official_ten_per_second() -> None:
+def test_quant_request_starts_leave_half_the_official_rate_budget_free() -> None:
     class FakeClock:
         def __init__(self) -> None:
             self.now = 0.0
@@ -184,7 +184,7 @@ def test_quant_request_starts_are_paced_below_official_ten_per_second() -> None:
     provider = LongbridgeProvider(
         Quote(),
         quant_http_factory=lambda: http,
-        quant_request_interval_seconds=0.125,
+        quant_request_interval_seconds=0.2,
         monotonic_clock=fake_clock.monotonic,
         quant_waiter=fake_clock.wait,
     )
@@ -205,9 +205,9 @@ def test_quant_request_starts_are_paced_below_official_ten_per_second() -> None:
 
     assert not result.errors
     starts = sorted(http.started_at)
-    assert starts == pytest.approx([0.0, 0.125, 0.25, 0.375])
+    assert starts == pytest.approx([0.0, 0.2, 0.4, 0.6])
     assert all(
-        right - left >= 0.125
+        right - left >= 0.2
         for left, right in pairwise(starts)
     )
 
@@ -781,7 +781,7 @@ def test_long_retry_after_wait_is_interrupted_without_retry_request() -> None:
     assert results[0].errors == {"AAPL.US": "canceled"}
 
 
-def test_second_rate_limit_opens_circuit_and_preserves_unexecuted_evidence() -> None:
+def test_scattered_rate_limits_recover_without_aborting_the_batch() -> None:
     class TwiceRateLimitedHttp(QuantHttp):
         def __init__(self) -> None:
             super().__init__()
@@ -798,9 +798,10 @@ def test_second_rate_limit_opens_circuit_and_preserves_unexecuted_evidence() -> 
             self.attempts_by_counter[counter] = (
                 self.attempts_by_counter.get(counter, 0) + 1
             )
-            if counter == "ST/US/S0" and self.attempts_by_counter[counter] == 1:
-                raise RuntimeError("429 rate limit")
-            if counter == "ST/US/S1":
+            if (
+                counter in {"ST/US/S0", "ST/US/S1"}
+                and self.attempts_by_counter[counter] == 1
+            ):
                 raise RuntimeError("429 rate limit")
             return super().request(method, path, body=body)
 
@@ -828,20 +829,14 @@ def test_second_rate_limit_opens_circuit_and_preserves_unexecuted_evidence() -> 
         progress=updates.append,
     )
 
-    assert sum(http.attempts_by_counter.values()) < len(symbols)
-    assert result.errors["S1.US"] == "rate_limited"
-    assert all(
-        result.errors[symbol] == "circuit_open"
-        for symbol in symbols[2:]
-    )
-    circuit_symbols = [
-        item.current_symbol
-        for item in updates
-        if item.feedback is not None
+    assert not result.errors
+    assert len(result.series_by_symbol) == len(symbols)
+    assert http.attempts_by_counter["ST/US/S0"] == 2
+    assert http.attempts_by_counter["ST/US/S1"] == 2
+    assert not any(
+        item.feedback is not None
         and item.feedback.kind is FeedbackKind.CIRCUIT_OPEN
-    ]
-    assert Counter(circuit_symbols) == Counter(
-        ("S1.US", *symbols[2:])
+        for item in updates
     )
 
 

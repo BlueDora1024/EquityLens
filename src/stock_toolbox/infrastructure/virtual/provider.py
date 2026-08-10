@@ -96,7 +96,6 @@ class VirtualProvider:
         self._unexecuted_symbols: list[str] = []
         self._feedback_kinds: list[str] = []
         self._daily_operation_control: OperationControl | None = None
-        self._daily_rate_limit_count = 0
         self._daily_circuit_open = False
         self._daily_circuit_code = ""
 
@@ -250,7 +249,6 @@ class VirtualProvider:
     ) -> BarsResult:
         if operation_control is not self._daily_operation_control:
             self._daily_operation_control = operation_control
-            self._daily_rate_limit_count = 0
             self._daily_circuit_open = False
             self._daily_circuit_code = ""
         series: dict[str, PriceSeries] = {}
@@ -298,57 +296,37 @@ class VirtualProvider:
                 FailureCode.SERVICE_UNAVAILABLE.value,
                 FailureCode.RATE_LIMITED.value,
             }:
-                if error == FailureCode.RATE_LIMITED.value:
-                    self._daily_rate_limit_count += 1
-                    self._daily_circuit_open = (
-                        self._daily_rate_limit_count >= 2
-                    )
-                    if self._daily_circuit_open:
-                        self._daily_circuit_code = error
                 feedback = self._feedback(
                     (
-                        FeedbackKind.CIRCUIT_OPEN
-                        if self._daily_circuit_open
-                        else (
-                            FeedbackKind.THROTTLED
-                            if error == FailureCode.RATE_LIMITED.value
-                            else FeedbackKind.RETRYING
-                        )
+                        FeedbackKind.THROTTLED
+                        if error == FailureCode.RATE_LIMITED.value
+                        else FeedbackKind.RETRYING
                     ),
                     error,
                     symbol,
                     attempt=1,
                 )
-                if not self._daily_circuit_open:
-                    self._record_external_calls((symbol,))
-                    retry_error = self._fault_event(
-                        "daily",
-                        symbol,
-                        completed - 1,
-                    )
-                    if not retry_error or retry_error == "ok":
-                        error = self._bar_errors.get(symbol)
-                        if error is None:
-                            feedback = self._feedback(
-                                FeedbackKind.RECOVERED,
-                                "",
-                                symbol,
-                                attempt=2,
-                            )
-                    else:
-                        error = retry_error
-                        if error == FailureCode.RATE_LIMITED.value:
-                            self._daily_rate_limit_count += 1
-                            self._daily_circuit_open = (
-                                self._daily_rate_limit_count >= 2
-                            )
-                            self._daily_circuit_code = error
-                            feedback = self._feedback(
-                                FeedbackKind.CIRCUIT_OPEN,
-                                error,
-                                symbol,
-                                attempt=2,
-                            )
+                self._record_external_calls((symbol,))
+                retry_error = self._fault_event(
+                    "daily",
+                    symbol,
+                    completed - 1,
+                )
+                if not retry_error or retry_error == "ok":
+                    error = self._bar_errors.get(symbol)
+                    if error is None:
+                        feedback = self._feedback(
+                            FeedbackKind.RECOVERED,
+                            "",
+                            symbol,
+                            attempt=2,
+                        )
+                else:
+                    # A bounded retry is local to this security.  Scattered
+                    # rate limits must not make later securities look
+                    # unexecuted; production uses its persistent-failure
+                    # CircuitBreaker for true error storms.
+                    error = retry_error
             if error in {
                 FailureCode.AUTHENTICATION_FAILED.value,
                 FailureCode.PERMISSION_DENIED.value,

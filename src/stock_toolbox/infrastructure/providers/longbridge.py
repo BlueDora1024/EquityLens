@@ -235,7 +235,7 @@ class LongbridgeProvider:
         # One request first validates auth/permission before opening the batch.
         concurrency = 1
         throttled = False
-        rate_limit_count = 0
+        rate_limit_seen = False
         breaker = CircuitBreaker()
         rate_limit_observed = Event()
         stop_failure_code: FailureCode | None = None
@@ -339,11 +339,11 @@ class LongbridgeProvider:
 
                         if code is FailureCode.RATE_LIMITED:
                             rate_limit_observed.clear()
-                            rate_limit_count += 1
-                            if rate_limit_count >= 2:
+                            rate_limit_seen = True
+                            concurrency = 1
+                            if breaker_open:
                                 errors[task.symbol] = error_code
                                 finished += 1
-                                concurrency = 1
                                 report(
                                     task.symbol,
                                     feedback(
@@ -355,9 +355,24 @@ class LongbridgeProvider:
                                 stop_failure_code = code
                                 stop_error = "circuit_open"
                                 break
-                            concurrency = 1
+
+                            retry_limit = max(1, self._max_retries)
+                            if task.attempt >= retry_limit:
+                                errors[task.symbol] = error_code
+                                finished += 1
+                                report(
+                                    task.symbol,
+                                    feedback(
+                                        FeedbackKind.ITEM_SKIPPED,
+                                        task,
+                                        code,
+                                        max_attempts=retry_limit + 1,
+                                    ),
+                                )
+                                continue
+
                             throttled = True
-                            max_attempts = task.attempt + 2
+                            max_attempts = retry_limit + 1
                             wait_seconds = self._retry_after_seconds(
                                 exception,
                                 fallback_seconds=float(
@@ -459,7 +474,7 @@ class LongbridgeProvider:
                         if (
                             concurrency == 1
                             and not throttled
-                            and rate_limit_count == 0
+                            and not rate_limit_seen
                         ):
                             concurrency = min(
                                 _QUANT_CONCURRENCY,
@@ -482,7 +497,7 @@ class LongbridgeProvider:
                     if (
                         concurrency == 1
                         and task.previous_failure is None
-                        and rate_limit_count == 0
+                        and not rate_limit_seen
                     ):
                         concurrency = min(
                             _QUANT_CONCURRENCY,

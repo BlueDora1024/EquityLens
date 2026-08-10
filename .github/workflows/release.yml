@@ -14,6 +14,10 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: release-macos-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     strategy:
@@ -68,3 +72,38 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
         run: gh release create "$RELEASE_TAG" release-assets/* --generate-notes --verify-tag
+
+  publish-latest:
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+          merge-multiple: true
+      - name: Point the rolling tag at this commit
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          if gh api "repos/${GITHUB_REPOSITORY}/git/ref/tags/latest" >/dev/null 2>&1; then
+            gh api --method PATCH "repos/${GITHUB_REPOSITORY}/git/refs/tags/latest" \
+              -f sha="$GITHUB_SHA" -F force=true >/dev/null
+          else
+            gh api --method POST "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/tags/latest" -f sha="$GITHUB_SHA" >/dev/null
+          fi
+      - name: Create or update the rolling latest release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          notes="Latest successful build from main (${GITHUB_SHA})."
+          if gh release view latest >/dev/null 2>&1; then
+            gh release upload latest release-assets/* --clobber
+            gh release edit latest --title "EquityLens Latest" --notes "$notes" --prerelease
+          else
+            gh release create latest release-assets/* \
+              --title "EquityLens Latest" --notes "$notes" --prerelease --verify-tag
+          fi

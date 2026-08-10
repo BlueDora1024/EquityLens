@@ -39,6 +39,16 @@ def test_release_workflow_builds_downloadable_artifacts_for_main_pushes() -> Non
     assert "if: startsWith(github.ref, 'refs/tags/')" in workflow
 
 
+def test_main_push_updates_a_rolling_latest_release() -> None:
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+
+    assert "publish-latest:" in workflow
+    assert "github.ref == 'refs/heads/main'" in workflow
+    assert "git/refs/tags/latest" in workflow
+    assert "gh release upload latest release-assets/* --clobber" in workflow
+    assert "gh release create latest release-assets/*" in workflow
+
+
 def test_public_project_identity_is_equitylens() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     readme = (ROOT / "README.md").read_text(encoding="utf-8")

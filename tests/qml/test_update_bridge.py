@@ -86,6 +86,7 @@ def test_current_build_identity_is_exposed() -> None:
     assert bridge.current_tag == "v1.0.1"
     assert bridge.current_sha == "0123456789ab"
     assert bridge.architecture == "Apple Silicon"
+    assert bridge.startup_check_enabled is False
 
 
 def test_completed_check_is_ignored_after_bridge_is_destroyed(qtbot) -> None:

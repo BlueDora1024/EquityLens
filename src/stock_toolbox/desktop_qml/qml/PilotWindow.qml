@@ -603,7 +603,8 @@ ApplicationWindow {
 
     Timer {
         interval: 1200
-        running: window.applicationReady && !window.firstRunRequired
+        running: window.updater.startup_check_enabled
+            && window.applicationReady && !window.firstRunRequired
         repeat: false
         onTriggered: window.updater.check_on_startup()
     }

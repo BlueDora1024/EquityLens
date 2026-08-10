@@ -115,6 +115,10 @@ class UpdateBridge(QObject):
     def architecture(self) -> str:
         return "Apple Silicon" if self._identity.architecture == "arm64" else "Intel"
 
+    @Property(bool, constant=True)
+    def startup_check_enabled(self) -> bool:
+        return bool(getattr(sys, "frozen", False))
+
     @Property(str, notify=changed)
     def status(self) -> str:
         return self._status

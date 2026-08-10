@@ -31,6 +31,14 @@ def test_release_workflow_builds_native_arm_and_intel_artifacts() -> None:
     assert "permissions:\n  contents: write" in workflow
 
 
+def test_release_workflow_builds_downloadable_artifacts_for_main_pushes() -> None:
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+
+    assert "branches: [main]" in workflow
+    assert "tags: [\"v*\"]" in workflow
+    assert "if: startsWith(github.ref, 'refs/tags/')" in workflow
+
+
 def test_public_project_identity_is_equitylens() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     readme = (ROOT / "README.md").read_text(encoding="utf-8")

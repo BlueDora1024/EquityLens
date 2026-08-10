@@ -64,7 +64,8 @@ from stock_toolbox.core.securities.models import (
 _NEW_YORK = ZoneInfo("America/New_York")
 _LOCAL_TIMEZONE = datetime.now().astimezone().tzinfo or UTC
 _DAILY_SERIES_CONCURRENCY = 4
-_QUANT_CONCURRENCY = 4
+_QUANT_CONCURRENCY = 2
+_QUANT_RATE_LIMIT_COOLDOWN_SECONDS = 10.0
 _DAILY_PAGE_SIZE = 1000
 _CANCELLABLE_RETRY_WAIT_SECONDS = 5.0
 _ADJUSTED_OHLC_ABSOLUTE_TOLERANCE = Decimal("0.01")
@@ -356,7 +357,7 @@ class LongbridgeProvider:
                                 stop_error = "circuit_open"
                                 break
 
-                            retry_limit = max(1, self._max_retries)
+                            retry_limit = 0 if self._max_retries == 0 else 2
                             if task.attempt >= retry_limit:
                                 errors[task.symbol] = error_code
                                 finished += 1
@@ -375,9 +376,7 @@ class LongbridgeProvider:
                             max_attempts = retry_limit + 1
                             wait_seconds = self._retry_after_seconds(
                                 exception,
-                                fallback_seconds=float(
-                                    min(2, 2**task.attempt)
-                                ),
+                                fallback_seconds=_QUANT_RATE_LIMIT_COOLDOWN_SECONDS,
                             )
                             report(
                                 task.symbol,
@@ -471,15 +470,6 @@ class LongbridgeProvider:
                                 max_attempts=retry_limit + 1,
                             ),
                         )
-                        if (
-                            concurrency == 1
-                            and not throttled
-                            and not rate_limit_seen
-                        ):
-                            concurrency = min(
-                                _QUANT_CONCURRENCY,
-                                len(normalized),
-                            )
                         continue
 
                     completed[task.symbol] = series
@@ -700,13 +690,15 @@ class LongbridgeProvider:
 
     def _quant_retry_limit(self, code: FailureCode) -> int:
         configured = self._max_retries
+        if configured == 0:
+            return 0
         if code in {FailureCode.NETWORK_ERROR, FailureCode.TIMEOUT}:
-            return min(configured, 2)
+            return min(max(configured, 2), 2)
         if code in {
             FailureCode.SERVICE_UNAVAILABLE,
             FailureCode.MALFORMED_RESPONSE,
         }:
-            return min(configured, 1)
+            return min(max(configured, 2), 2)
         return 0
 
     def _wait_before_retry(
@@ -1397,6 +1389,14 @@ class LongbridgeProvider:
             )
         ):
             return "quota_exhausted"
+        if isinstance(exception, OpenApiException):
+            provider_code = exception.code
+            if (
+                isinstance(provider_code, int)
+                and not isinstance(provider_code, bool)
+                and provider_code in {429, 301606, 429002}
+            ):
+                return "rate_limited"
         if (
             isinstance(exception, OpenApiException)
             # Runtime exposes ErrorKind.Http as a singleton; the stub says type.
@@ -1446,7 +1446,12 @@ class LongbridgeProvider:
             or "access denied" in message
         ):
             return "permission_denied"
-        if "rate limit" in message or "429" in message:
+        if (
+            "rate limit" in message
+            or "request is limited" in message
+            or "slow down request frequency" in message
+            or "429" in message
+        ):
             return "rate_limited"
         if "timeout" in message or "timed out" in message:
             return "timeout"
@@ -1470,6 +1475,8 @@ class LongbridgeProvider:
         if (
             "temporary" in message
             or "unavailable" in message
+            or "internal error" in message
+            or "server error" in message
             or any(
                 token in message
                 for token in ("500", "502", "503", "504", "5xx")

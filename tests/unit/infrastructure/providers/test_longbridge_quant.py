@@ -336,14 +336,14 @@ def test_quant_endpoint_returns_per_symbol_failures_without_raw_kline_fallback()
     assert result.errors == {"AAPL.US": "service_unavailable"}
 
 
-def test_quant_endpoint_caps_parallel_requests_at_four() -> None:
+def test_quant_endpoint_caps_parallel_requests_at_two() -> None:
     class BlockingHttp(QuantHttp):
         def __init__(self) -> None:
             super().__init__()
             self.active = 0
             self.maximum = 0
             self.lock = Lock()
-            self.four_started = Event()
+            self.two_started = Event()
 
         def request(
             self,
@@ -355,9 +355,9 @@ def test_quant_endpoint_caps_parallel_requests_at_four() -> None:
             with self.lock:
                 self.active += 1
                 self.maximum = max(self.maximum, self.active)
-                if self.active == 4:
-                    self.four_started.set()
-            self.four_started.wait(timeout=1)
+                if self.active == 2:
+                    self.two_started.set()
+            self.two_started.wait(timeout=1)
             try:
                 return super().request(method, path, body=body)
             finally:
@@ -385,7 +385,53 @@ def test_quant_endpoint_caps_parallel_requests_at_four() -> None:
     )
 
     assert len(result.series_by_symbol) == 8
-    assert http.maximum == 4
+    assert http.maximum == 2
+
+
+def test_quant_endpoint_retries_transient_internal_server_error() -> None:
+    class OnceInternalErrorHttp(QuantHttp):
+        def __init__(self) -> None:
+            super().__init__()
+            self.attempts = 0
+
+        def request(
+            self,
+            method: str,
+            path: str,
+            *,
+            body: dict[str, object],
+        ) -> dict[str, object]:
+            self.attempts += 1
+            if self.attempts == 1:
+                raise RuntimeError("internal error")
+            return super().request(method, path, body=body)
+
+    http = OnceInternalErrorHttp()
+    waits: list[float] = []
+    provider = LongbridgeProvider(
+        Quote(),
+        quant_http_factory=lambda: http,
+        max_retries=1,
+        sleeper=waits.append,
+    )
+    request = QuantSeriesRequest(
+        "rs-v2",
+        CandleInterval.DAY,
+        datetime(2025, 1, 1, tzinfo=UTC),
+        datetime(2025, 2, 1, tzinfo=UTC),
+        'indicator("rs"); plot(close, "close");',
+        ("close",),
+    )
+
+    result = provider.get_quant_series(
+        ("AAPL.US",),
+        request,
+        operation_control=control(),
+    )
+
+    assert not result.errors
+    assert http.attempts == 2
+    assert waits == [1.0]
 
 
 def test_quant_submission_is_bounded_and_cancellation_prevents_later_calls(
@@ -429,7 +475,7 @@ def test_quant_submission_is_bounded_and_cancellation_prevents_later_calls(
             super().__init__()
             self.started = 0
             self.lock = Lock()
-            self.four_blocked = Event()
+            self.two_blocked = Event()
             self.release = Event()
 
         def request(
@@ -442,8 +488,8 @@ def test_quant_submission_is_bounded_and_cancellation_prevents_later_calls(
             with self.lock:
                 self.started += 1
                 call_number = self.started
-                if self.started == 5:
-                    self.four_blocked.set()
+                if self.started == 3:
+                    self.two_blocked.set()
             if call_number > 1:
                 self.release.wait(timeout=1)
             return super().request(method, path, body=body)
@@ -480,14 +526,14 @@ def test_quant_submission_is_bounded_and_cancellation_prevents_later_calls(
 
     thread = Thread(target=run)
     thread.start()
-    assert http.four_blocked.wait(timeout=1)
+    assert http.two_blocked.wait(timeout=1)
     registry.cancel("op-cancel")
     http.release.set()
     thread.join(timeout=1)
 
     assert not thread.is_alive()
-    assert TrackingExecutor.maximum_pending <= 4
-    assert http.started == 5
+    assert TrackingExecutor.maximum_pending <= 2
+    assert http.started == 3
     assert results
 
 
@@ -552,7 +598,7 @@ def test_compatible_transport_honors_retry_after_and_recovers_one_lane() -> None
             self.active = 0
             self.recovery_maximum = 0
             self.lock = Lock()
-            self.ramp_four_started = Event()
+            self.ramp_two_started = Event()
             self.throttle_observed = Event()
             self.allow_rate_limit = Event()
             self.rate_limit_raised = Event()
@@ -568,15 +614,15 @@ def test_compatible_transport_honors_retry_after_and_recovers_one_lane() -> None
                 self.started += 1
                 call_number = self.started
                 self.active += 1
-                if self.started == 5:
-                    self.ramp_four_started.set()
-                if call_number > 5:
+                if self.started == 3:
+                    self.ramp_two_started.set()
+                if call_number > 3:
                     self.recovery_maximum = max(
                         self.recovery_maximum,
                         self.active,
                     )
-            if 2 <= call_number <= 5:
-                self.ramp_four_started.wait(timeout=1)
+            if 2 <= call_number <= 3:
+                self.ramp_two_started.wait(timeout=1)
             try:
                 if body["counter_id"] == "ST/US/MSFT" and not self.failed:
                     self.allow_rate_limit.wait(timeout=1)
@@ -584,7 +630,7 @@ def test_compatible_transport_honors_retry_after_and_recovers_one_lane() -> None
                     self.rate_limit_raised.set()
                     raise TransportRateLimited
                 if (
-                    2 <= call_number <= 5
+                    2 <= call_number <= 3
                     and body["counter_id"] != "ST/US/NVDA"
                 ):
                     self.throttle_observed.wait(timeout=1)
@@ -657,7 +703,13 @@ def test_compatible_transport_honors_retry_after_and_recovers_one_lane() -> None
 )
 def test_invalid_retry_after_uses_finite_controlled_fallback(
     retry_after: str,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(
+        longbridge_module,
+        "_CANCELLABLE_RETRY_WAIT_SECONDS",
+        11.0,
+    )
     class InvalidRetryAfter(RuntimeError):
         def __init__(self) -> None:
             super().__init__("429 rate limit")
@@ -706,7 +758,7 @@ def test_invalid_retry_after_uses_finite_controlled_fallback(
     )
 
     assert not result.errors
-    assert waits == [1.0]
+    assert waits == [10.0]
 
 
 def test_long_retry_after_wait_is_interrupted_without_retry_request() -> None:
@@ -1014,30 +1066,18 @@ def test_breaker_drains_running_work_and_only_marks_unexecuted_tasks(
 
     assert set(result.series_by_symbol) == {"S0.US", "S2.US"}
     assert result.errors["S1.US"] == "service_unavailable"
-    assert result.errors["S3.US"] == "insufficient_data"
     assert all(
         result.errors[symbol] == "circuit_open"
-        for symbol in symbols[4:]
+        for symbol in symbols[3:]
     )
-    assert len(http.calls) == 4
+    assert len(http.calls) == 3
     assert Counter(item.current_symbol for item in updates) == Counter(symbols)
     assert updates[-1].completed == len(symbols)
     assert all(
         item.feedback is not None
         and item.feedback.kind is FeedbackKind.CIRCUIT_OPEN
         for item in updates
-        if item.current_symbol in set(symbols[4:])
-    )
-    failed_running = next(
-        item
-        for item in updates
-        if item.current_symbol == "S3.US"
-    )
-    assert failed_running.feedback is not None
-    assert failed_running.feedback.kind is FeedbackKind.ITEM_SKIPPED
-    assert (
-        failed_running.feedback.failure_code
-        is FailureCode.INSUFFICIENT_DATA
+        if item.current_symbol in set(symbols[3:])
     )
 
 
@@ -1157,25 +1197,17 @@ def test_fatal_stop_drains_running_work_and_only_marks_unexecuted_tasks(
 
     assert set(result.series_by_symbol) == {"S0.US", "S2.US"}
     assert result.errors["S1.US"] == "authentication_failed"
-    assert result.errors["S3.US"] == "insufficient_data"
     assert all(
         result.errors[symbol] == "authentication_failed"
-        for symbol in symbols[4:]
+        for symbol in symbols[3:]
     )
-    assert len(http.calls) == 4
+    assert len(http.calls) == 3
     assert Counter(item.current_symbol for item in updates) == Counter(symbols)
-    failed_running = next(
-        item
-        for item in updates
-        if item.current_symbol == "S3.US"
-    )
-    assert failed_running.feedback is not None
-    assert failed_running.feedback.kind is FeedbackKind.ITEM_SKIPPED
     assert all(
         item.feedback is not None
         and item.feedback.kind is FeedbackKind.FATAL
         for item in updates
-        if item.current_symbol in {"S1.US", *symbols[4:]}
+        if item.current_symbol in {"S1.US", *symbols[3:]}
     )
 
 
@@ -1308,7 +1340,13 @@ def test_openapi_http_code_outranks_conflicting_data_text(
     code: int,
     message: str,
     expected: FailureCode,
+    monkeypatch: pytest.MonkeyPatch,
 ) -> None:
+    monkeypatch.setattr(
+        longbridge_module,
+        "_CANCELLABLE_RETRY_WAIT_SECONDS",
+        11.0,
+    )
     class ConflictingHttp(QuantHttp):
         def __init__(self) -> None:
             super().__init__()
@@ -1371,7 +1409,11 @@ def test_openapi_http_code_outranks_conflicting_data_text(
     else:
         assert len(http.calls) == 2
         assert not result.errors
-        assert waits == [1.0]
+        assert waits == (
+            [10.0]
+            if expected is FailureCode.RATE_LIMITED
+            else [1.0]
+        )
 
 
 def test_explicit_quota_exhaustion_takes_precedence_over_http_429() -> None:
@@ -1422,7 +1464,14 @@ def test_explicit_quota_exhaustion_takes_precedence_over_http_429() -> None:
     assert updates[0].feedback.failure_code is FailureCode.QUOTA_EXHAUSTED
 
 
-def test_openapi_rate_limit_uses_controlled_fallback_without_headers() -> None:
+def test_openapi_rate_limit_uses_controlled_fallback_without_headers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        longbridge_module,
+        "_CANCELLABLE_RETRY_WAIT_SECONDS",
+        11.0,
+    )
     class ProductionRateLimitedHttp(QuantHttp):
         def __init__(self) -> None:
             super().__init__()
@@ -1481,7 +1530,7 @@ def test_openapi_rate_limit_uses_controlled_fallback_without_headers() -> None:
     ]
     assert not result.errors
     assert len(http.calls) == 3
-    assert waits == [1.0, 2.0]
+    assert waits == [1.0, 10.0]
     assert [item.kind for item in feedback] == [
         FeedbackKind.RETRYING,
         FeedbackKind.THROTTLED,
@@ -1489,7 +1538,78 @@ def test_openapi_rate_limit_uses_controlled_fallback_without_headers() -> None:
         FeedbackKind.RECOVERED,
     ]
     assert feedback[1].failure_code is FailureCode.RATE_LIMITED
-    assert feedback[1].wait_seconds == 2.0
+    assert feedback[1].wait_seconds == 10.0
+
+
+def test_quant_openapi_business_rate_limit_slows_down_then_recovers(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(
+        longbridge_module,
+        "_CANCELLABLE_RETRY_WAIT_SECONDS",
+        11.0,
+    )
+    class BusinessRateLimitedHttp(QuantHttp):
+        def __init__(self) -> None:
+            super().__init__()
+            self.attempts = 0
+
+        def request(
+            self,
+            method: str,
+            path: str,
+            *,
+            body: dict[str, object],
+        ) -> dict[str, object]:
+            self.attempts += 1
+            if self.attempts == 1:
+                self.calls.append((method, path, body))
+                raise OpenApiException(
+                    ErrorKind.OpenApi,
+                    429002,
+                    "production-trace",
+                    "api request is limited, please slow down request frequency",
+                )
+            return super().request(method, path, body=body)
+
+    http = BusinessRateLimitedHttp()
+    waits: list[float] = []
+    updates: list[QuantProgress] = []
+    provider = LongbridgeProvider(
+        Quote(),
+        quant_http_factory=lambda: http,
+        max_retries=1,
+        sleeper=waits.append,
+    )
+    request = QuantSeriesRequest(
+        "rs-v2",
+        CandleInterval.DAY,
+        datetime(2025, 1, 1, tzinfo=UTC),
+        datetime(2025, 2, 1, tzinfo=UTC),
+        'indicator("rs"); plot(close, "close");',
+        ("close",),
+    )
+
+    result = provider.get_quant_series(
+        ("AAPL.US",),
+        request,
+        operation_control=control(),
+        progress=updates.append,
+    )
+
+    assert not result.errors
+    assert http.attempts == 2
+    assert waits == [10.0]
+    feedback = [item.feedback for item in updates if item.feedback is not None]
+    assert [item.kind for item in feedback] == [
+        FeedbackKind.THROTTLED,
+        FeedbackKind.RETRYING,
+        FeedbackKind.RECOVERED,
+    ]
+    assert all(
+        item.failure_code is FailureCode.RATE_LIMITED
+        for item in feedback
+    )
 
 
 def test_statusless_openapi_network_error_retries_twice_then_recovers() -> None:

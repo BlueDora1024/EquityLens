@@ -3174,9 +3174,9 @@ def _longbridge_provider(
         quant_http_factory=contexts.quant_http_factory,
         max_retries=settings.max_retries,
         # Direct Quant HTTP calls bypass QuoteContext's SDK-side limiter.
-        # Keep starts at five per second so calendar/snapshot traffic still
-        # has headroom under Longbridge's account-wide quote budget.
-        quant_request_interval_seconds=0.2,
+        # Production accounts can enforce a stricter rolling bucket on this
+        # endpoint, so leave enough headroom for other quote traffic.
+        quant_request_interval_seconds=0.75,
     )
 
 

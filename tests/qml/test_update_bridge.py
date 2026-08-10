@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from threading import Event
+
 from stock_toolbox.desktop_qml.update_bridge import UpdateBridge
 from stock_toolbox.infrastructure.updates.models import BuildIdentity, ReleaseAsset, ReleaseInfo
 
@@ -23,6 +25,19 @@ class _Service:
         if isinstance(self.release, Exception):
             raise self.release
         return self.release
+
+
+class _BlockingService:
+    def __init__(self) -> None:
+        self.started = Event()
+        self.resume = Event()
+        self.finished = Event()
+
+    def latest_release(self, _architecture: str) -> ReleaseInfo:
+        self.started.set()
+        self.resume.wait(timeout=2)
+        self.finished.set()
+        return _release()
 
 
 def test_startup_check_is_non_blocking_and_opens_prompt_for_new_release(qtbot) -> None:
@@ -71,3 +86,19 @@ def test_current_build_identity_is_exposed() -> None:
     assert bridge.current_tag == "v1.0.1"
     assert bridge.current_sha == "0123456789ab"
     assert bridge.architecture == "Apple Silicon"
+
+
+def test_completed_check_is_ignored_after_bridge_is_destroyed(qtbot) -> None:
+    service = _BlockingService()
+    bridge = UpdateBridge(
+        identity=BuildIdentity("1.0.1", "v1.0.1", "a" * 40, "arm64"),
+        service=service,
+    )
+
+    assert bridge.check_on_startup() is True
+    assert service.started.wait(timeout=2)
+    bridge.deleteLater()
+    qtbot.wait(20)
+    service.resume.set()
+    assert service.finished.wait(timeout=2)
+    qtbot.wait(100)

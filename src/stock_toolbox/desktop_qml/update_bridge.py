@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Protocol
 
 from PySide6.QtCore import Property, QCoreApplication, QObject, QRunnable, QThreadPool, Signal, Slot
+from shiboken6 import isValid
 
 from stock_toolbox import __version__
 from stock_toolbox.infrastructure.updates.installer import launch_replacement, stage_update
@@ -248,6 +249,8 @@ class UpdateBridge(QObject):
         self._task = task
 
         def finish(raw: object) -> None:
+            if not isValid(self):
+                return
             self._task = None
             completed(raw)
 

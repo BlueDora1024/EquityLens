@@ -10,6 +10,8 @@ ROOT = Path(SPECPATH).parent
 PROJECT = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
 VERSION = str(PROJECT["project"]["version"])
 TARGET_ARCH = os.environ.get("EQUITYLENS_TARGET_ARCH") or platform.machine()
+RELEASE_TAG = os.environ.get("EQUITYLENS_RELEASE_TAG") or "local"
+GIT_SHA = os.environ.get("EQUITYLENS_GIT_SHA") or "development"
 if TARGET_ARCH not in {"arm64", "x86_64"}:
     raise ValueError(f"unsupported target architecture: {TARGET_ARCH}")
 FUTU_HIDDEN = [
@@ -96,7 +98,10 @@ application = BUNDLE(
         "CFBundleDisplayName": "EquityLens",
         "CFBundleName": "EquityLens",
         "CFBundleShortVersionString": VERSION,
-        "CFBundleVersion": "28",
+        "CFBundleVersion": "29",
+        "EquityLensReleaseTag": RELEASE_TAG,
+        "EquityLensGitSHA": GIT_SHA,
+        "EquityLensArchitecture": TARGET_ARCH,
         "LSMinimumSystemVersion": "13.0",
         "NSHighResolutionCapable": True,
     },

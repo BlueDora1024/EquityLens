@@ -34,6 +34,10 @@ def test_gui_spec_uses_the_release_icon() -> None:
     assert 'bundle_identifier="com.equitylens.desktop"' in spec
     assert '"CFBundleDisplayName": "EquityLens"' in spec
     assert 'TARGET_ARCH = os.environ.get("EQUITYLENS_TARGET_ARCH")' in spec
+    assert 'RELEASE_TAG = os.environ.get("EQUITYLENS_RELEASE_TAG")' in spec
+    assert 'GIT_SHA = os.environ.get("EQUITYLENS_GIT_SHA")' in spec
+    assert '"EquityLensReleaseTag": RELEASE_TAG' in spec
+    assert '"EquityLensGitSHA": GIT_SHA' in spec
     assert '"stock_toolbox/desktop/resources"' in spec
     assert '"stock_toolbox/desktop_qml/qml"' in spec
 

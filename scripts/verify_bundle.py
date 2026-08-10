@@ -105,6 +105,8 @@ def main() -> int:
         plist.get("CFBundleIdentifier") != "com.equitylens.desktop"
         or plist.get("CFBundleDisplayName") != "EquityLens"
         or plist.get("CFBundleShortVersionString") != VERSION
+        or not plist.get("EquityLensReleaseTag")
+        or not plist.get("EquityLensGitSHA")
     ):
         raise SystemExit("bundle identity is invalid")
     icon_name = plist.get("CFBundleIconFile")
@@ -144,6 +146,8 @@ def main() -> int:
         "schema_version": "bundle-manifest-v1",
         "bundle_identifier": plist["CFBundleIdentifier"],
         "version": plist["CFBundleShortVersionString"],
+        "release_tag": plist["EquityLensReleaseTag"],
+        "release_git_sha": plist["EquityLensGitSHA"],
         "build_host": platform.platform(),
         "python": platform.python_version(),
         "git_commit": subprocess.run(

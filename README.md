@@ -49,6 +49,10 @@ EquityLens 首次启动时会在当前 macOS 用户目录下创建独立的空�
 应用目前使用 ad-hoc 签名，尚未经过 Apple 公证。macOS 可能要求你手动确认打开。
 发布包不包含任何供应商账户或凭据。
 
+从 v1.1.0 起，应用会在启动后异步检查 GitHub 正式版本，也可在“设置 → 高级 →
+版本与更新”手动检查。内置更新器只下载匹配当前 Mac 架构的包，核对 SHA256 后替换
+应用并重启；本地证券、配置与历史记录不会被修改。每个正式 Release 都包含简短更新说明。
+
 ### 本地开发
 
 环境要求：macOS、Python 3.12、Xcode Command Line Tools。
@@ -130,6 +134,12 @@ Download the archive matching your Mac from
 
 The app is ad-hoc signed rather than notarized. macOS may ask you to confirm that you
 want to open it. Provider accounts and credentials are never bundled.
+
+Starting with v1.1.0, the app checks official GitHub Releases asynchronously after
+startup. You can also check manually under Settings → Advanced → Version & Updates.
+The updater downloads only the matching architecture, verifies SHA256, replaces the
+app, and relaunches it without modifying local securities, settings, or history.
+Every formal Release includes concise release notes.
 
 ### Develop locally
 

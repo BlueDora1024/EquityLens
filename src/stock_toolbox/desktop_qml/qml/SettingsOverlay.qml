@@ -19,6 +19,7 @@ Rectangle {
     property bool networkSectionFocused: false
     // qmllint disable unqualified
     property var bridge: settingsBridge
+    property var updater: updateBridge
     // qmllint enable unqualified
 
     color: Theme.modalScrim
@@ -1241,6 +1242,76 @@ Rectangle {
                         ColumnLayout {
                             width: advancedScroll.availableWidth
                             spacing: 10
+
+                        GlassPanel {
+                            objectName: "updateSettingsPanel"
+                            Layout.fillWidth: true
+                            Layout.preferredHeight: 180
+
+                            ColumnLayout {
+                                anchors.fill: parent
+                                anchors.margins: 18
+                                spacing: 10
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    ColumnLayout {
+                                        Layout.fillWidth: true
+                                        spacing: 2
+                                        Text {
+                                            text: "版本与更新"
+                                            color: Theme.text
+                                            font.pixelSize: 14
+                                            font.weight: Font.DemiBold
+                                        }
+                                        Text {
+                                            text: "正式版本由 GitHub Release 提供，并按本机架构安全更新。"
+                                            color: Theme.secondaryText
+                                            font.pixelSize: 10
+                                        }
+                                    }
+                                    Text {
+                                        text: overlay.updater.update_available
+                                            ? "● 有新版本" : "● 当前版本"
+                                        color: overlay.updater.update_available
+                                            ? Theme.accent : Theme.success
+                                        font.pixelSize: 10
+                                    }
+                                }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    spacing: 24
+                                    ColumnLayout {
+                                        Text { text: "当前版本"; color: Theme.faintText; font.pixelSize: 9 }
+                                        Text { text: overlay.updater.current_tag + "  (" + overlay.updater.current_version + ")"; color: Theme.text; font.pixelSize: 11 }
+                                    }
+                                    ColumnLayout {
+                                        Text { text: "构建 SHA"; color: Theme.faintText; font.pixelSize: 9 }
+                                        Text { text: overlay.updater.current_sha; color: Theme.text; font.pixelSize: 11; font.family: "Menlo" }
+                                    }
+                                    ColumnLayout {
+                                        Text { text: "架构"; color: Theme.faintText; font.pixelSize: 9 }
+                                        Text { text: overlay.updater.architecture; color: Theme.text; font.pixelSize: 11 }
+                                    }
+                                    Item { Layout.fillWidth: true }
+                                }
+                                RowLayout {
+                                    Layout.fillWidth: true
+                                    BusySpinner { running: overlay.updater.busy; visible: running }
+                                    Text {
+                                        Layout.fillWidth: true
+                                        text: overlay.updater.message || "启动检查不会阻塞主窗口；离线时不会打扰。"
+                                        color: overlay.updater.status === "error" ? Theme.danger : Theme.secondaryText
+                                        font.pixelSize: 10
+                                    }
+                                    GlassButton {
+                                        objectName: "manualUpdateCheckButton"
+                                        text: overlay.updater.busy ? "检查中…" : "检查更新"
+                                        enabled: !overlay.updater.busy
+                                        onClicked: overlay.updater.check_now()
+                                    }
+                                }
+                            }
+                        }
 
                         GlassPanel {
                             Layout.fillWidth: true

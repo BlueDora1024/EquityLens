@@ -16,6 +16,8 @@ case "$TARGET_ARCH" in
         ;;
 esac
 export EQUITYLENS_TARGET_ARCH="$TARGET_ARCH"
+export EQUITYLENS_RELEASE_TAG="${EQUITYLENS_RELEASE_TAG:-local}"
+export EQUITYLENS_GIT_SHA="${EQUITYLENS_GIT_SHA:-$(git rev-parse HEAD 2>/dev/null || printf development)}"
 VERSION=$("$PYTHON" -c \
     'import sys,tomllib; print(tomllib.load(open(sys.argv[1],"rb"))["project"]["version"])' \
     "$ROOT/pyproject.toml")

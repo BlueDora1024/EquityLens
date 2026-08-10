@@ -1097,3 +1097,16 @@ def test_import_editor_scrolls_and_close_actions_have_distinct_draft_semantics()
     assert "function finishAndClear" in source
     assert "masterDataBridge.reset_import_session()" in source
     assert "onClicked: overlay.closeRequested()" in source
+
+
+def test_update_ui_exposes_advanced_card_and_non_blocking_prompt() -> None:
+    settings = qml_text("SettingsOverlay.qml")
+    window = qml_text("PilotWindow.qml")
+    overlay = qml_text("UpdateOverlay.qml")
+
+    assert 'objectName: "updateSettingsPanel"' in settings
+    assert "当前版本" in settings
+    assert "检查更新" in settings
+    assert "UpdateOverlay" in window
+    assert "下载并更新" in overlay
+    assert "本地证券、配置和历史记录不会被修改" in overlay

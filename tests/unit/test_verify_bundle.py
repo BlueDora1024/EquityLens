@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from pathlib import Path
+
 import pytest
 
 from scripts.verify_bundle import (
@@ -54,3 +56,10 @@ def test_bundle_requires_embedded_futu_and_yahoo() -> None:
         "futu",
         "yfinance",
     )
+
+
+def test_bundle_verifier_requires_embedded_release_identity() -> None:
+    root = Path(__file__).resolve().parents[2]
+    source = (root / "scripts/verify_bundle.py").read_text(encoding="utf-8")
+    assert 'plist.get("EquityLensReleaseTag")' in source
+    assert 'plist.get("EquityLensGitSHA")' in source

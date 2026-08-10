@@ -45,6 +45,8 @@ jobs:
       - name: Build and verify native bundle
         env:
           EQUITYLENS_TARGET_ARCH: ${{ matrix.arch }}
+          EQUITYLENS_RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest') }}
+          EQUITYLENS_GIT_SHA: ${{ github.sha }}
           PYTHON_BIN: ${{ github.workspace }}/.venv/bin/python
           PYINSTALLER_BIN: ${{ github.workspace }}/.venv/bin/pyinstaller
           QMLLINT_BIN: ${{ github.workspace }}/.venv/bin/pyside6-qmllint
@@ -62,6 +64,9 @@ jobs:
     needs: build
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref }}
       - uses: actions/download-artifact@v4
         with:
           path: release-assets
@@ -71,7 +76,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-        run: gh release create "$RELEASE_TAG" release-assets/* --generate-notes --verify-tag
+        run: |
+          NOTES_FILE="docs/releases/${RELEASE_TAG}.md"
+          test -s "$NOTES_FILE"
+          gh release create "$RELEASE_TAG" release-assets/* \
+            --title "EquityLens ${RELEASE_TAG}" \
+            --notes-file "$NOTES_FILE" --verify-tag
 
   publish-latest:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'

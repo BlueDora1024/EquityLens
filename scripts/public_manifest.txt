@@ -17,4 +17,7 @@ docs/technical/ALGORITHMS.md
 docs/technical/ARCHITECTURE.md
 docs/technical/FIRST_RUN_AND_SETTINGS.md
 docs/technical/INTEGRATIONS.md
+docs/releases/
 docs/superpowers/plans/2026-08-09-equitylens-open-source-release.md
+docs/superpowers/plans/2026-08-10-equitylens-self-update.md
+docs/superpowers/specs/2026-08-10-equitylens-self-update-design.md

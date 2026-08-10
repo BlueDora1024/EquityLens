@@ -21,11 +21,15 @@ ApplicationWindow {
     property bool scenarioOpen: false
     property bool closeGuardOpen: false
     property bool closeAfterCancel: false
+    // qmllint disable unqualified
+    property var updater: updateBridge
+    // qmllint enable unqualified
     property string closeGuardStatus: ""
     property Item closeGuardPreviousFocusItem: null
     readonly property bool modalOverlayOpen:
         settingsOpen || importOpen || scenarioOpen || closeGuardOpen
         || productTourOpen
+        || window.updater.prompt_visible
         || (rsRunPage.visible && rsRunPage.modalOverlayOpen)
         || (masterDataPage.visible && masterDataPage.modalOverlayOpen)
         || (rsHistoryPage.visible && rsHistoryPage.modalOverlayOpen)
@@ -381,6 +385,11 @@ ApplicationWindow {
             }
         }
 
+        UpdateOverlay {
+            anchors.fill: parent
+            visible: window.updater.prompt_visible
+        }
+
         FocusScope {
             id: closeGuard
             objectName: "activeOperationCloseGuard"
@@ -590,6 +599,13 @@ ApplicationWindow {
         sequences: [StandardKey.Preferences]
         enabled: !window.modalOverlayOpen
         onActivated: window.openSettingsUnlessModal()
+    }
+
+    Timer {
+        interval: 1200
+        running: window.applicationReady && !window.firstRunRequired
+        repeat: false
+        onTriggered: window.updater.check_on_startup()
     }
 
     Binding {

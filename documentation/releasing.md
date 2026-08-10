@@ -24,4 +24,13 @@ Pull requests run deterministic tests. A `v*` tag builds on two native GitHub-ho
 runners: Apple silicon (`macos-15`) and Intel (`macos-15-intel`). Each produces its own app
 archive and checksum. The publish job attaches both architectures to one GitHub Release.
 
+Formal tags must include `docs/releases/<tag>.md`. The workflow fails closed when the
+file is missing and uses it as the GitHub Release body, so both the Releases page and the
+in-app updater show the same concise change summary.
+
+Builds embed the Release tag, Git commit SHA, and architecture in `Info.plist`. From
+v1.1.0, EquityLens checks the latest stable Release in the background and can download,
+verify, replace, and relaunch the app. The updater never writes to Application Support;
+local databases and credentials remain outside the bundle replacement boundary.
+
 No provider or AI credential is required or embedded by CI.

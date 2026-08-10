@@ -27,6 +27,7 @@ from stock_toolbox.desktop_qml.shell_bridge import ShellBridge
 from stock_toolbox.desktop_qml.theme_bridge import ThemeBridge
 from stock_toolbox.desktop_qml.turning_point_bridge import TurningPointBridge
 from stock_toolbox.desktop_qml.ui_stall_monitor import UiStallMonitor
+from stock_toolbox.desktop_qml.update_bridge import UpdateBridge
 from stock_toolbox.desktop_qml.vibrancy import install_vibrancy
 from stock_toolbox.runtime.environment import RuntimeEnvironment
 
@@ -59,6 +60,7 @@ def build_pilot_engine(
     turning_point_bridge = TurningPointBridge(application, engine)
     extreme_deviation_bridge = ExtremeDeviationBridge(application, engine)
     scenario_bridge = ScenarioBridge(application, engine)
+    update_bridge = UpdateBridge(engine)
     settings = application.settings()
     engine.rootContext().setContextProperty("themeBridge", theme_bridge)
     engine.rootContext().setContextProperty("shellBridge", shell_bridge)
@@ -75,6 +77,7 @@ def build_pilot_engine(
         extreme_deviation_bridge,
     )
     engine.rootContext().setContextProperty("scenarioBridge", scenario_bridge)
+    engine.rootContext().setContextProperty("updateBridge", update_bridge)
     rs_run_bridge.finished.connect(
         lambda raw: _show_rs_result(
             raw,

@@ -49,6 +49,19 @@ def test_main_push_updates_a_rolling_latest_release() -> None:
     assert "gh release create latest release-assets/*" in workflow
 
 
+def test_formal_release_requires_and_publishes_versioned_release_notes() -> None:
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    assert 'docs/releases/${RELEASE_TAG}.md' in workflow
+    assert '--notes-file "$NOTES_FILE"' in workflow
+    assert "--generate-notes" not in workflow
+
+
+def test_build_injects_release_tag_and_git_sha() -> None:
+    workflow = (ROOT / ".github/workflows/release.yml").read_text(encoding="utf-8")
+    assert "EQUITYLENS_RELEASE_TAG:" in workflow
+    assert "EQUITYLENS_GIT_SHA: ${{ github.sha }}" in workflow
+
+
 def test_public_project_identity_is_equitylens() -> None:
     project = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))["project"]
     readme = (ROOT / "README.md").read_text(encoding="utf-8")

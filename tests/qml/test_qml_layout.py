@@ -313,7 +313,9 @@ def test_product_tour_card_and_actions_fit_minimum_window(
     )
     for slide, target_name in enumerate(targets):
         overlay.setProperty("currentSlide", slide)
-        QTest.qWait(220)
+        # The focus target is refreshed with Qt.callLater before the 180 ms
+        # transition starts, so leave enough time for both event-loop turns.
+        QTest.qWait(400)
         target = window.findChild(QQuickItem, target_name)
         assert target is not None
         ring_x, ring_y, ring_width, ring_height = _scene_bounds(focus_ring)

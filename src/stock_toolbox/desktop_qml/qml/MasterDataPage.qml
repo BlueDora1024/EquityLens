@@ -44,6 +44,33 @@ Item {
         // qmllint enable unqualified
     }
 
+    function restoreListPosition(listView, scrollPosition) {
+        Qt.callLater(function() {
+            const maximum = Math.max(0,
+                listView.contentHeight - listView.height)
+            listView.contentY = Math.max(0,
+                Math.min(scrollPosition, maximum))
+        })
+    }
+
+    function mutateListPreservingPosition(listView, mutation) {
+        const scrollPosition = listView.contentY
+        const result = mutation()
+        if (result) {
+            page.restoreListPosition(listView, scrollPosition)
+        }
+        return result
+    }
+
+    function refreshSelectedCollection(collectionName, selectedId) {
+        // qmllint disable unqualified
+        const collection = collectionName === "classifications"
+            ? masterDataBridge.classifications
+            : masterDataBridge.watchlists
+        // qmllint enable unqualified
+        selectedEntity = collection.find(item => item.id === selectedId) || null
+    }
+
     function setClassification(classificationId, selected) {
         if (!selectedSecurity) {
             return
@@ -54,12 +81,16 @@ Item {
         } else if (!selected) {
             ids = ids.filter(item => item !== classificationId)
         }
-        // qmllint disable unqualified
-        if (masterDataBridge.set_security_classifications(
-                selectedSecurity.id, ids)) {
-            page.refreshSelectedSecurity()
-        }
-        // qmllint enable unqualified
+        return page.mutateListPreservingPosition(masterList, function() {
+            // qmllint disable unqualified
+            const updated = masterDataBridge.set_security_classifications(
+                selectedSecurity.id, ids)
+            // qmllint enable unqualified
+            if (updated) {
+                page.refreshSelectedSecurity()
+            }
+            return updated
+        })
     }
 
     function requestClassificationRemoval(security, classificationId) {
@@ -102,22 +133,58 @@ Item {
     }
 
     function updateSelectedWatchlistBinding(securityId, bindingId) {
-        const scrollPosition = entityMemberList.contentY
-        // qmllint disable unqualified
-        const updated = masterDataBridge.update_watchlist_member_binding(
-            masterDataBridge.selected_watchlist_id,
-            securityId,
-            bindingId)
-        // qmllint enable unqualified
-        if (updated) {
-            Qt.callLater(function() {
-                const maximum = Math.max(0,
-                    entityMemberList.contentHeight - entityMemberList.height)
-                entityMemberList.contentY = Math.max(0,
-                    Math.min(scrollPosition, maximum))
+        return page.mutateListPreservingPosition(
+            entityMemberList,
+            function() {
+                // qmllint disable unqualified
+                return masterDataBridge.update_watchlist_member_binding(
+                    masterDataBridge.selected_watchlist_id,
+                    securityId,
+                    bindingId)
+                // qmllint enable unqualified
             })
+    }
+
+    function removeSelectedWatchlistMember(securityId) {
+        return page.mutateListPreservingPosition(
+            entityMemberList,
+            function() {
+                // qmllint disable unqualified
+                return masterDataBridge.remove_watchlist_member(
+                    masterDataBridge.selected_watchlist_id,
+                    securityId)
+                // qmllint enable unqualified
+            })
+    }
+
+    function confirmClassificationRemoval() {
+        if (!classificationUnbindImpact.securityId) {
+            return false
         }
-        return updated
+        // qmllint disable unqualified
+        const currentPage = shellBridge.current_page
+        // qmllint enable unqualified
+        const collectionId = selectedEntity && selectedEntity.id
+            ? selectedEntity.id : classificationUnbindImpact.classificationId
+        const targetList = currentPage === "securities"
+            ? masterList : entityMemberList
+        return page.mutateListPreservingPosition(targetList, function() {
+            // qmllint disable unqualified
+            const removed = masterDataBridge.remove_security_classification(
+                page.classificationUnbindImpact.securityId,
+                page.classificationUnbindImpact.classificationId)
+            // qmllint enable unqualified
+            if (!removed) {
+                return false
+            }
+            page.classificationUnbindConfirmOpen = false
+            if (currentPage === "classifications") {
+                page.refreshSelectedCollection("classifications", collectionId)
+            } else {
+                page.refreshSelectedSecurity()
+            }
+            return true
+        })
     }
 
     ColumnLayout {
@@ -857,18 +924,24 @@ Item {
                                 text: "重命名"
                                 enabled: watchlistNameInput.text.trim().length > 0
                                 onClicked: {
+                                    const selectedId = page.selectedEntity.id
                                     // qmllint disable unqualified
-                                    if (masterDataBridge.rename_watchlist(
-                                            page.selectedEntity.id,
-                                            watchlistNameInput.text)) {
-                                        page.selectedEntity =
-                                            masterDataBridge.watchlists.find(
-                                                item => item.id
-                                                    === page.selectedEntity.id)
+                                    const renamed = page
+                                        .mutateListPreservingPosition(
+                                            masterList,
+                                            function() {
+                                                return masterDataBridge
+                                                    .rename_watchlist(
+                                                        selectedId,
+                                                        watchlistNameInput.text)
+                                            })
+                                    // qmllint enable unqualified
+                                    if (renamed) {
+                                        page.refreshSelectedCollection(
+                                            "watchlists", selectedId)
                                         watchlistNameInput.text =
                                             page.selectedEntity.name
                                     }
-                                    // qmllint enable unqualified
                                 }
                             }
                             GlassButton {
@@ -968,13 +1041,9 @@ Item {
                                             === "watchlists"
                                         // qmllint enable unqualified
                                         text: "移除"
-                                        onClicked: {
-                                            // qmllint disable unqualified
-                                            masterDataBridge.remove_watchlist_member(
-                                                masterDataBridge.selected_watchlist_id,
+                                        onClicked: page
+                                            .removeSelectedWatchlistMember(
                                                 poolMember.modelData.securityId)
-                                            // qmllint enable unqualified
-                                        }
                                     }
                                     GlassButton {
                                         // qmllint disable unqualified
@@ -1029,19 +1098,30 @@ Item {
                                     text: "重命名"
                                     enabled: renameInput.text.trim().length > 0
                                     onClicked: {
+                                        const selectedId = page.selectedEntity.id
                                         // qmllint disable unqualified
-                                        const ok = shellBridge.current_page
-                                            === "classifications"
-                                            ? masterDataBridge.rename_classification(
-                                                page.selectedEntity.id,
-                                                renameInput.text)
-                                            : masterDataBridge.rename_watchlist(
-                                                page.selectedEntity.id,
-                                                renameInput.text)
+                                        const collectionName =
+                                            shellBridge.current_page
+                                        const ok = page
+                                            .mutateListPreservingPosition(
+                                                masterList,
+                                                function() {
+                                                    return collectionName
+                                                        === "classifications"
+                                                        ? masterDataBridge
+                                                            .rename_classification(
+                                                                selectedId,
+                                                                renameInput.text)
+                                                        : masterDataBridge
+                                                            .rename_watchlist(
+                                                                selectedId,
+                                                                renameInput.text)
+                                                })
                                         // qmllint enable unqualified
                                         if (ok) {
                                             renameInput.clear()
-                                            page.selectedEntity = null
+                                            page.refreshSelectedCollection(
+                                                collectionName, selectedId)
                                         }
                                     }
                                 }
@@ -1089,10 +1169,16 @@ Item {
         // qmllint enable unqualified
         onCloseRequested: page.classificationMemberOpen = false
         onSubmitRequested: securityIds => {
-            // qmllint disable unqualified
-            masterDataBridge.add_classification_members(
-                page.selectedEntity.id, securityIds)
-            // qmllint enable unqualified
+            page.mutateListPreservingPosition(
+                entityMemberList,
+                function() {
+                    // qmllint disable unqualified
+                    const result = masterDataBridge
+                        .add_classification_members(
+                            page.selectedEntity.id, securityIds)
+                    // qmllint enable unqualified
+                    return Boolean(result)
+                })
         }
     }
 
@@ -1371,19 +1457,7 @@ Item {
                     GlassButton {
                         text: "确认移除"
                         primary: true
-                        onClicked: {
-                            // qmllint disable unqualified
-                            const ok = masterDataBridge
-                                .remove_security_classification(
-                                    page.classificationUnbindImpact.securityId,
-                                    page.classificationUnbindImpact
-                                        .classificationId)
-                            // qmllint enable unqualified
-                            if (ok) {
-                                page.classificationUnbindConfirmOpen = false
-                                page.refreshSelectedSecurity()
-                            }
-                        }
+                        onClicked: page.confirmClassificationRemoval()
                     }
                 }
             }

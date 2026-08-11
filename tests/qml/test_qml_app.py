@@ -645,6 +645,168 @@ def test_watchlist_page_preserves_scroll_when_a_member_binding_changes(
 
     assert float(member_list.property("contentY")) == pytest.approx(600.0)
 
+    assert QMetaObject.invokeMethod(
+        page,
+        "removeSelectedWatchlistMember",
+        Q_ARG("QVariant", target_id),
+    ) is True
+    QTest.qWait(80)
+
+    assert member_list.property("count") == 39
+    assert float(member_list.property("contentY")) == pytest.approx(600.0)
+
+
+def test_security_page_preserves_scroll_when_tags_change(
+    qapp,
+    scenario_application,
+) -> None:
+    scenario_application.import_securities(
+        ",".join(f"TEST{index:03d}" for index in range(40))
+    )
+    extra = scenario_application.master_data.create_classification("第二标签")
+    securities = scenario_application.master_data.list_securities()
+    target = securities[30]
+
+    engine = build_pilot_engine(
+        scenario_application,
+        RuntimeEnvironment.SCENARIO,
+    )
+    window = engine.rootObjects()[0]
+    shell = engine.rootContext().contextProperty("shellBridge")
+    page = window.findChild(QObject, "masterDataPage")
+    assert shell.navigate("securities")
+    page.setProperty(
+        "selectedSecurity",
+        {
+            "id": target.id,
+            "classifications": [
+                {
+                    "id": target.bindings[0].classification_id,
+                    "name": target.bindings[0].classification_name,
+                }
+            ],
+        },
+    )
+    page.setProperty("selectedEntity", page.property("selectedSecurity"))
+    window.resize(1280, 800)
+    window.show()
+    QTest.qWait(80)
+    master_list = next(
+        item
+        for item in page.findChildren(QObject)
+        if item.metaObject().className() == "QQuickListView"
+        and item.property("visible") is True
+        and item.property("count") == 40
+    )
+    assert master_list.setProperty("contentY", 600.0)
+
+    assert QMetaObject.invokeMethod(
+        page,
+        "setClassification",
+        Q_ARG("QVariant", extra.id),
+        Q_ARG("QVariant", True),
+    ) is True
+    QTest.qWait(80)
+
+    assert float(master_list.property("contentY")) == pytest.approx(600.0)
+    selected_security = page.property("selectedSecurity")
+    if hasattr(selected_security, "toVariant"):
+        selected_security = selected_security.toVariant()
+    assert selected_security["id"] == target.id
+
+    assert QMetaObject.invokeMethod(
+        page,
+        "requestClassificationRemoval",
+        Q_ARG("QVariant", selected_security),
+        Q_ARG("QVariant", extra.id),
+    ) is True
+    QTest.qWait(20)
+    confirm_button = next(
+        item
+        for item in page.findChildren(QObject)
+        if item.property("text") == "确认移除"
+        and item.property("visible") is True
+    )
+    assert QMetaObject.invokeMethod(confirm_button, "clicked") is True
+    QTest.qWait(80)
+
+    assert float(master_list.property("contentY")) == pytest.approx(600.0)
+    refreshed_security = page.property("selectedSecurity")
+    if hasattr(refreshed_security, "toVariant"):
+        refreshed_security = refreshed_security.toVariant()
+    assert all(
+        item["id"] != extra.id
+        for item in refreshed_security["classifications"]
+    )
+
+
+def test_classification_page_keeps_context_after_repeated_member_removals(
+    qapp,
+    scenario_application,
+) -> None:
+    scenario_application.import_securities(
+        ",".join(f"TEST{index:03d}" for index in range(12))
+    )
+    classification = scenario_application.master_data.create_classification(
+        "待清理标签"
+    )
+    securities = scenario_application.master_data.list_securities()
+    for security in securities:
+        scenario_application.master_data.set_security_classifications(
+            security.id,
+            (security.bindings[0].classification_id, classification.id),
+        )
+
+    engine = build_pilot_engine(
+        scenario_application,
+        RuntimeEnvironment.SCENARIO,
+    )
+    window = engine.rootObjects()[0]
+    shell = engine.rootContext().contextProperty("shellBridge")
+    bridge = engine.rootContext().contextProperty("masterDataBridge")
+    page = window.findChild(QObject, "masterDataPage")
+    member_list = window.findChild(QObject, "watchlistMemberList")
+    assert shell.navigate("classifications")
+    bridge.select_classification(classification.id)
+    selected = next(
+        item
+        for item in bridge.classifications
+        if item["id"] == classification.id
+    )
+    page.setProperty("selectedEntity", selected)
+    window.resize(1280, 800)
+    window.show()
+    QTest.qWait(80)
+    assert member_list.property("count") == 12
+    assert member_list.setProperty("contentY", 160.0)
+
+    for expected_count, security in ((11, securities[0]), (10, securities[1])):
+        assert QMetaObject.invokeMethod(
+            page,
+            "requestClassificationRemoval",
+            Q_ARG(
+                "QVariant",
+                {"id": security.id, "securityId": security.id},
+            ),
+            Q_ARG("QVariant", classification.id),
+        ) is True
+        QTest.qWait(20)
+        confirm_button = next(
+            item
+            for item in page.findChildren(QObject)
+            if item.property("text") == "确认移除"
+            and item.property("visible") is True
+        )
+        assert QMetaObject.invokeMethod(confirm_button, "clicked") is True
+        QTest.qWait(80)
+
+        assert member_list.property("count") == expected_count
+        selected_entity = page.property("selectedEntity")
+        if hasattr(selected_entity, "toVariant"):
+            selected_entity = selected_entity.toVariant()
+        assert selected_entity["id"] == classification.id
+        assert float(member_list.property("contentY")) > 0
+
 
 def test_import_progress_animates_between_stage_targets(
     qapp,

@@ -2,7 +2,7 @@
 
 ## Longbridge
 
-正式实现使用 Longbridge Python SDK 4.4.1。OAuth 由 `OAuthBuilder` 发起浏览器
+正式实现使用 Longbridge Python SDK 4.4.3。OAuth 由 `OAuthBuilder` 发起浏览器
 授权，授权后由 `Config.from_oauth()` 创建配置；SDK 自动持久化和刷新 token。
 应用通过长桥动态客户端注册取得 Client ID，普通用户无需创建或填写。完整首次授权、
 质检与恢复规则见[首次配置与设置](FIRST_RUN_AND_SETTINGS.md)。

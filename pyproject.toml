@@ -11,7 +11,7 @@ requires-python = ">=3.12,<3.13"
 dependencies = [
   "futu-api==10.9.6908",
   "httpx==0.28.1",
-  "longbridge==4.4.1",
+  "longbridge==4.4.3",
   "PySide6==6.11.1",
   "pydantic==2.13.4",
   "socksio==1.0.0",

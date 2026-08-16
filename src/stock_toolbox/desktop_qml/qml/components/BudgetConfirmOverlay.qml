@@ -26,6 +26,11 @@ Item {
 
     anchors.fill: parent
     z: 1000
+    opacity: visible ? 1 : 0
+
+    Behavior on opacity {
+        NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+    }
 
     Rectangle {
         anchors.fill: parent
@@ -37,16 +42,24 @@ Item {
     }
 
     GlassPanel {
+        id: dialogPanel
+        objectName: "budgetConfirmPanel"
         anchors.centerIn: parent
-        width: Math.min(520, overlay.width - 48)
-        height: overlay.quotaBlocked || overlay.futuSerialNotice.length > 0 ? 350 : 310
+        width: Math.min(600, overlay.width - 64)
+        height: overlay.quotaBlocked || overlay.futuSerialNotice.length > 0 ? 340 : 300
+        scale: overlay.visible ? 1 : 0.975
+
+        Behavior on scale {
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
 
         ColumnLayout {
             anchors.fill: parent
-            anchors.margins: 24
-            spacing: 14
+            anchors.margins: 22
+            spacing: 12
 
             Text {
+                objectName: "budgetConfirmTitle"
                 text: overlay.quotaBlocked
                     ? "富途历史额度不足"
                     : "确认本次资源消耗"
@@ -55,6 +68,7 @@ Item {
                 font.weight: Font.DemiBold
             }
             Text {
+                objectName: "budgetConfirmBody"
                 Layout.fillWidth: true
                 text: overlay.quotaBlocked
                     ? "本次需要新增 " + overlay.quotaNewSymbols
@@ -78,6 +92,7 @@ Item {
             }
 
             GridLayout {
+                objectName: "budgetConfirmMetrics"
                 Layout.fillWidth: true
                 columns: 3
                 columnSpacing: 10
@@ -85,28 +100,30 @@ Item {
 
                 GlassMetric {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 68
+                    Layout.preferredHeight: 64
                     label: "证券 × " + overlay.dimensionLabel
                     value: overlay.memberCount + " × " + overlay.dimensionCount
                 }
                 GlassMetric {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 68
-                    label: "缓存命中"
+                    Layout.preferredHeight: 64
+                    label: "当前源完整命中"
                     value: String(overlay.cacheHits)
                 }
                 GlassMetric {
                     Layout.fillWidth: true
-                    Layout.preferredHeight: 68
+                    Layout.preferredHeight: 64
                     label: "预计外部请求"
                     value: String(overlay.coldRequests)
                 }
             }
 
             Text {
+                objectName: "budgetConfirmDataPath"
                 Layout.fillWidth: true
                 text: "数据路径：" + overlay.dataPath
                     + " · 预计任务：" + overlay.totalTasks
+                    + " · 部分历史会继续复用，但不计作完整命中"
                 color: Theme.faintText
                 font.pixelSize: 10
                 elide: Text.ElideRight
@@ -115,6 +132,7 @@ Item {
             Item { Layout.fillHeight: true }
 
             RowLayout {
+                objectName: "budgetConfirmActions"
                 Layout.fillWidth: true
                 Item { Layout.fillWidth: true }
                 GlassButton {

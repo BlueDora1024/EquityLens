@@ -881,7 +881,10 @@ class RsRunBridge(QObject):
         if raw.requires_confirmation:
             self._status_text = "本次任务较大 · 等待确认"
             self._stage_label = "资源预算确认"
-            self._stage_detail = f"预计 {raw.cold_requests} 个外部请求，已缓存 {raw.cache_hits} 个"
+            self._stage_detail = (
+                f"预计 {raw.cold_requests} 个外部请求，"
+                f"当前数据源完整命中 {raw.cache_hits} 个"
+            )
             self.changed.emit()
             return
         self._launch_run(request)

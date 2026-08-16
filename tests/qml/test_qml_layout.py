@@ -875,6 +875,73 @@ Item {
     assert overlay.property("visible") is True
 
 
+def test_budget_confirmation_panel_is_centered_and_compact_at_supported_sizes(
+    qapp,
+) -> None:
+    engine = QQmlEngine()
+    engine.addImportPath(str(_QML_ROOT))
+    component = QQmlComponent(engine)
+    component.setData(
+        """
+import QtQuick
+import "components"
+
+Item {
+    objectName: "budgetProbe"
+    width: 980
+    height: 680
+
+    BudgetConfirmOverlay {
+        objectName: "budgetProbeOverlay"
+        anchors.fill: parent
+        visible: true
+        memberCount: 600
+        dimensionCount: 6
+        totalTasks: 3600
+        cacheHits: 125
+        coldRequests: 3475
+        dataPath: "Longbridge · 当前数据源"
+    }
+}
+""".encode(),
+        QUrl.fromLocalFile(str(_QML_ROOT / "BudgetConfirmProbe.qml")),
+    )
+    root = component.create()
+    assert root is not None, [error.toString() for error in component.errors()]
+
+    overlay = root.findChild(QQuickItem, "budgetProbeOverlay")
+    panel = root.findChild(QQuickItem, "budgetConfirmPanel")
+    assert overlay is not None
+    assert panel is not None
+
+    for width, height in ((980, 680), (1280, 800), (1600, 1000)):
+        root.setWidth(width)
+        root.setHeight(height)
+        QTest.qWait(10)
+
+        panel_x, panel_y, panel_width, panel_height = _scene_bounds(panel)
+        assert panel_width == 600
+        assert panel_height == 300
+        assert abs(panel_x - ((width - panel_width) / 2)) <= 1
+        assert abs(panel_y - ((height - panel_height) / 2)) <= 1
+        assert panel_height / height <= 0.45
+
+        for object_name in (
+            "budgetConfirmTitle",
+            "budgetConfirmBody",
+            "budgetConfirmMetrics",
+            "budgetConfirmDataPath",
+            "budgetConfirmActions",
+        ):
+            child = root.findChild(QQuickItem, object_name)
+            assert child is not None
+            child_x, child_y, child_width, child_height = _scene_bounds(child)
+            assert panel_x <= child_x
+            assert panel_y <= child_y
+            assert child_x + child_width <= panel_x + panel_width + 1
+            assert child_y + child_height <= panel_y + panel_height + 1
+
+
 def test_close_guard_can_exit_when_operation_finishes_before_cancel_click(
     qapp,
     scenario_application,

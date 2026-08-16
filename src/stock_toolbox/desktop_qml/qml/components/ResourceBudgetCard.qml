@@ -15,7 +15,7 @@ GlassPanel {
     property string quotaNotice: ""
     property string dimensionLabel: "周期"
 
-    implicitHeight: 58
+    implicitHeight: 64
 
     RowLayout {
         anchors.fill: parent
@@ -56,7 +56,7 @@ GlassPanel {
                 {"label": "证券", "value": card.memberCount},
                 {"label": card.dimensionLabel, "value": card.dimensionCount},
                 {"label": "预计任务", "value": card.totalTasks},
-                {"label": "缓存命中", "value": card.cacheHits},
+                {"label": "完整命中", "value": card.cacheHits},
                 {"label": "预计外部请求", "value": card.coldRequests}
             ]
 

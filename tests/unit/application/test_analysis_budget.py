@@ -14,6 +14,7 @@ from stock_toolbox.analyses.rs_strength.application.models import RunRequest
 from stock_toolbox.analyses.turning_point.application.models import (
     TurningPointRequest,
 )
+from stock_toolbox.core.market_data.cache import CandleRequestCoverage
 from stock_toolbox.core.market_data.models import (
     CandleInterval,
     MarketCandle,
@@ -127,6 +128,12 @@ class CandleCache:
             else None
         )
 
+    def request_coverage(self, provider_id, symbol, interval):
+        covered_through = self.covered_through(provider_id, symbol, interval)
+        if covered_through is None:
+            return None
+        return CandleRequestCoverage(covered_through, 650, 650)
+
     def load(self, provider_id, symbol, interval, end_at, limit):
         del provider_id, end_at
         if (symbol, interval) not in self.complete:
@@ -140,6 +147,27 @@ class CandleCache:
             0,
         )
         return (candle,) * limit
+
+
+class ShortHistoryCandleCache(CandleCache):
+    def __init__(self, symbol: str, interval: CandleInterval) -> None:
+        super().__init__({(symbol, interval)})
+        self.symbol = symbol
+        self.interval = interval
+
+    def request_coverage(self, provider_id, symbol, interval):
+        del provider_id
+        if (symbol, interval) != (self.symbol, self.interval):
+            return None
+        return CandleRequestCoverage(
+            datetime.combine(date(2026, 7, 24), time.max, UTC),
+            650,
+            635,
+        )
+
+    def load(self, provider_id, symbol, interval, end_at, limit):
+        rows = super().load(provider_id, symbol, interval, end_at, limit)
+        return rows[:635]
 
 
 class DailyCache:
@@ -272,6 +300,25 @@ def test_extreme_single_security_budget_resolves_global_security_without_watchli
     assert budget.member_count == 1
     assert budget.dimension_count == 1
     assert budget.total_tasks == 1
+
+
+def test_extreme_budget_accepts_authoritative_short_listing_history() -> None:
+    interval = CandleInterval.DAY
+    budget = service(
+        1,
+        provider_id="futu",
+        candle_cache=ShortHistoryCandleCache("S0.US", interval),
+    ).estimate_extreme(
+        ExtremeDeviationRequest(
+            "",
+            (interval,),
+            date(2026, 7, 24),
+            security_id="security-0",
+        )
+    )
+
+    assert budget.cache_hits == 1
+    assert budget.cold_requests == 0
 
 
 def test_budget_snapshot_carries_read_only_storage_preflight() -> None:

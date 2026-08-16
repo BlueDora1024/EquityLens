@@ -37,13 +37,53 @@ class CandleCachePort(Protocol):
         interval: CandleInterval,
     ) -> datetime | None: ...
 
+    def request_coverage(
+        self,
+        provider_id: str,
+        symbol: str,
+        interval: CandleInterval,
+    ) -> CandleRequestCoverage | None: ...
+
     def mark_covered_through(
         self,
         provider_id: str,
         symbol: str,
         interval: CandleInterval,
         end_at: datetime,
+        *,
+        requested_count: int,
+        returned_count: int,
     ) -> None: ...
+
+
+@dataclass(frozen=True, slots=True)
+class CandleRequestCoverage:
+    covered_through: datetime
+    requested_count: int
+    returned_count: int
+
+
+def cache_covers_request(
+    coverage: CandleRequestCoverage | None,
+    *,
+    cached_count: int,
+    end_at: datetime,
+    requested_count: int,
+) -> bool:
+    """Whether a previous provider response authoritatively covers this request.
+
+    A provider can legitimately return fewer rows than requested for a newly
+    listed security.  Persisting both counts lets a repeated identical request
+    reuse that complete short history without treating any arbitrary partial
+    cache as complete.
+    """
+
+    if coverage is None or coverage.covered_through < end_at:
+        return False
+    if coverage.requested_count < requested_count:
+        return False
+    expected_rows = min(requested_count, coverage.returned_count)
+    return expected_rows > 0 and cached_count >= expected_rows
 
 
 @dataclass(frozen=True, slots=True)
@@ -89,7 +129,7 @@ class CachedCandleService:
             for symbol in normalized
         }
         coverage = {
-            symbol: self._cache.covered_through(
+            symbol: self._cache.request_coverage(
                 self._provider_id,
                 symbol,
                 interval,
@@ -99,7 +139,12 @@ class CachedCandleService:
         misses = tuple(
             symbol
             for symbol in normalized
-            if len(cached[symbol]) < count or not _coverage_reaches(coverage[symbol], end_at)
+            if not cache_covers_request(
+                coverage[symbol],
+                cached_count=len(cached[symbol]),
+                end_at=end_at,
+                requested_count=count,
+            )
         )
         errors: dict[str, str] = {}
         fetched = 0
@@ -109,7 +154,7 @@ class CachedCandleService:
                     interval,
                     count,
                     len(cached[symbol]),
-                    coverage[symbol],
+                    _covered_through(coverage[symbol]),
                     end_at,
                 )
                 for symbol in misses
@@ -131,16 +176,18 @@ class CachedCandleService:
                     errors[symbol] = remote.errors.get(symbol, "candles_unavailable")
                     continue
                 self._cache.upsert(self._provider_id, series)
+                cached[symbol] = self._cache.load(
+                    self._provider_id, symbol, interval, end_at, count
+                )
                 self._cache.mark_covered_through(
                     self._provider_id,
                     symbol,
                     interval,
                     end_at,
+                    requested_count=count,
+                    returned_count=len(cached[symbol]),
                 )
                 fetched += 1
-                cached[symbol] = self._cache.load(
-                    self._provider_id, symbol, interval, end_at, count
-                )
 
         output = {
             symbol: CandleSeries(symbol, interval, candles)
@@ -202,11 +249,8 @@ _MAX_REGULAR_BARS_PER_DAY = {
 }
 
 
-def _coverage_reaches(
-    covered_through: datetime | None,
-    end_at: datetime,
-) -> bool:
-    return covered_through is not None and covered_through >= end_at
+def _covered_through(coverage: CandleRequestCoverage | None) -> datetime | None:
+    return coverage.covered_through if coverage is not None else None
 
 
 def _tail_request_count(

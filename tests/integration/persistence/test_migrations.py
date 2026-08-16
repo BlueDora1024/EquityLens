@@ -61,8 +61,8 @@ def test_empty_database_migrates_to_exact_table_schema(
 
     report = runner(database).bootstrap()
 
-    assert report.schema_version == 12
-    assert report.applied_versions == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+    assert report.schema_version == 13
+    assert report.applied_versions == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
     assert report.journal_mode == "wal"
     assert table_names(database) == EXPECTED_TABLES
     with sqlite3.connect(database) as connection:
@@ -155,6 +155,13 @@ def test_empty_database_migrates_to_exact_table_schema(
                 "2026-07-25T12:00:00.000000Z",
                 "0.1.0",
             ),
+            (
+                13,
+                "candle_request_coverage",
+                64,
+                "2026-07-25T12:00:00.000000Z",
+                "0.1.0",
+            ),
         ]
         assert connection.execute("PRAGMA quick_check").fetchone()[0] == "ok"
 
@@ -166,9 +173,9 @@ def test_bootstrap_is_idempotent_and_does_not_reapply_migration(
     first = runner(database).bootstrap()
     second = runner(database).bootstrap()
 
-    assert first.applied_versions == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12)
+    assert first.applied_versions == (1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13)
     assert second.applied_versions == ()
-    assert second.schema_version == 12
+    assert second.schema_version == 13
 
 
 def test_invalid_two_and_four_hour_turning_quant_cache_is_deleted(
@@ -199,7 +206,7 @@ def test_invalid_two_and_four_hour_turning_quant_cache_is_deleted(
 
     report = default_runner.bootstrap()
 
-    assert report.applied_versions == (10, 11, 12)
+    assert report.applied_versions == (10, 11, 12, 13)
     with sqlite3.connect(database) as connection:
         remaining = connection.execute(
             "SELECT interval FROM quant_result_cache ORDER BY interval"
@@ -232,7 +239,7 @@ def test_retired_turning_risk_quant_cache_is_deleted(tmp_path: Path) -> None:
 
     report = default_runner.bootstrap()
 
-    assert report.applied_versions == (9, 10, 11, 12)
+    assert report.applied_versions == (9, 10, 11, 12, 13)
     with sqlite3.connect(database) as connection:
         remaining = connection.execute("SELECT count(*) FROM quant_result_cache").fetchone()[0]
     assert remaining == 0
@@ -262,7 +269,7 @@ def test_database_version_newer_than_application_is_rejected(
     runner(database).bootstrap()
     with sqlite3.connect(database) as connection:
         connection.execute(
-            "INSERT INTO schema_migrations VALUES (13,'future',"
+            "INSERT INTO schema_migrations VALUES (14,'future',"
             "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',"
             "'2026-07-25T12:00:00.000000Z','9.0.0')"
         )

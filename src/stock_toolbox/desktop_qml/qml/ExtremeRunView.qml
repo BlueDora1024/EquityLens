@@ -404,7 +404,7 @@ Item {
                     GlassMetric {
                         Layout.fillWidth: true
                         Layout.preferredHeight: 62
-                        label: "缓存命中"
+                        label: "完整命中"
                         // qmllint disable unqualified
                         value: String(extremeDeviationBridge.cache_hits)
                         // qmllint enable unqualified

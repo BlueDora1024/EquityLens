@@ -26,6 +26,7 @@ from stock_toolbox.analyses.extreme_deviation.application.models import (
 from stock_toolbox.analyses.extreme_deviation.application.quant import (
     SUPPORTED_INTERVALS,
 )
+from stock_toolbox.analyses.resource_budget import AnalysisBudgetSnapshot
 from stock_toolbox.analyses.rs_strength.application.models import RunRequest
 from stock_toolbox.analyses.turning_point.application.models import (
     TurningPointRequest,
@@ -417,6 +418,22 @@ def _capture(output: Path, *, width: int = 1280, height: int = 800) -> None:
                         save_state("turning-risk-unknown-light.png")
 
             shell.navigate("rs_strength.run")
+            rs_run._budget_request = rs_run.build_request()
+            rs_run._budget_snapshot = AnalysisBudgetSnapshot(
+                member_count=600,
+                dimension_count=6,
+                total_tasks=3600,
+                cache_hits=125,
+                cold_requests=3475,
+                cold_limit=50,
+                data_path="Longbridge · 当前数据源",
+                provider_id="longbridge",
+            )
+            rs_run.changed.emit()
+            save_state(f"resource-budget-confirm-{mode}.png")
+            rs_run._budget_request = None
+            rs_run._budget_snapshot = None
+            rs_run.changed.emit()
             for filename, state, running, failures, status in (
                 ("outcome-retrying", retrying, True, 0, "连接波动 · 正在恢复"),
                 ("outcome-one-lane", throttled, True, 0, "请求受限 · 等待继续"),

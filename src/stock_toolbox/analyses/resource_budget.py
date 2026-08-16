@@ -33,6 +33,10 @@ from stock_toolbox.core.market_data.budget import (
     estimate_multi_period,
     estimate_rs,
 )
+from stock_toolbox.core.market_data.cache import (
+    CandleRequestCoverage,
+    cache_covers_request,
+)
 from stock_toolbox.core.market_data.models import (
     CandleInterval,
     MarketCandle,
@@ -87,6 +91,13 @@ class CandleBudgetCachePort(Protocol):
         symbol: str,
         interval: CandleInterval,
     ) -> datetime | None: ...
+
+    def request_coverage(
+        self,
+        provider_id: str,
+        symbol: str,
+        interval: CandleInterval,
+    ) -> CandleRequestCoverage | None: ...
 
 
 class DailyBudgetCachePort(Protocol):
@@ -434,24 +445,25 @@ class AnalysisBudgetService:
         for interval in intervals:
             hits: set[str] = set()
             for symbol in symbols:
-                coverage = self._candle_cache.covered_through(
+                coverage = self._candle_cache.request_coverage(
                     self._provider_id,
                     symbol,
                     interval,
                 )
-                if coverage is None or coverage < end_at:
-                    continue
-                if (
-                    len(
-                        self._candle_cache.load(
-                            self._provider_id,
-                            symbol,
-                            interval,
-                            end_at,
-                            count,
-                        )
+                cached_count = len(
+                    self._candle_cache.load(
+                        self._provider_id,
+                        symbol,
+                        interval,
+                        end_at,
+                        count,
                     )
-                    >= count
+                )
+                if cache_covers_request(
+                    coverage,
+                    cached_count=cached_count,
+                    end_at=end_at,
+                    requested_count=count,
                 ):
                     hits.add(symbol)
             hits_by_interval.append(frozenset(hits))

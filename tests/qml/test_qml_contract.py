@@ -652,7 +652,7 @@ def test_analysis_runs_share_resource_budget_preflight_and_confirmation() -> Non
 
     for token in (
         "预计任务",
-        "缓存命中",
+        "完整命中",
         "预计外部请求",
         "数据路径",
         "最多四路并发",
@@ -670,6 +670,10 @@ def test_analysis_runs_share_resource_budget_preflight_and_confirmation() -> Non
         "改用 Yahoo",
         "继续使用富途",
         "yahooRequested",
+        "当前源完整命中",
+        "部分历史会继续复用",
+        "Behavior on opacity",
+        "Behavior on scale",
     ):
         assert token in overlay
 
@@ -702,6 +706,7 @@ def test_budget_overlay_has_a_dedicated_futu_quota_shortfall_decision() -> None:
 
     for token in (
         'objectName: "budgetConfirmOverlay"',
+        'objectName: "budgetConfirmPanel"',
         "property int quotaRemaining: -1",
         "property int quotaNewSymbols: -1",
         "property int quotaShortfall: 0",
@@ -709,6 +714,8 @@ def test_budget_overlay_has_a_dedicated_futu_quota_shortfall_decision() -> None:
         '"富途历史额度不足"',
         '"本次使用 Yahoo"',
         "visible: !overlay.quotaBlocked",
+        "Behavior on opacity",
+        "Behavior on scale",
     ):
         assert token in source
     assert source.count("color: Theme.modalScrim") == 1

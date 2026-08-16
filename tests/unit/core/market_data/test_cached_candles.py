@@ -3,7 +3,10 @@ from __future__ import annotations
 from datetime import UTC, datetime, timedelta
 from decimal import Decimal
 
-from stock_toolbox.core.market_data.cache import CachedCandleService
+from stock_toolbox.core.market_data.cache import (
+    CachedCandleService,
+    CandleRequestCoverage,
+)
 from stock_toolbox.core.market_data.models import (
     CandleDataset,
     CandleInterval,
@@ -39,6 +42,8 @@ class MemoryCache:
     ) -> None:
         self.candles = candles
         self.coverage = covered_through
+        self.requested_count = len(candles) if covered_through is not None else 0
+        self.returned_count = len(candles) if covered_through is not None else 0
         self.upserts = 0
         self.coverage_updates = 0
 
@@ -56,10 +61,31 @@ class MemoryCache:
         del provider_id, symbol, interval
         return self.coverage
 
-    def mark_covered_through(self, provider_id, symbol, interval, end_at):
+    def request_coverage(self, provider_id, symbol, interval):
+        del provider_id, symbol, interval
+        if self.coverage is None:
+            return None
+        return CandleRequestCoverage(
+            self.coverage,
+            self.requested_count,
+            self.returned_count,
+        )
+
+    def mark_covered_through(
+        self,
+        provider_id,
+        symbol,
+        interval,
+        end_at,
+        *,
+        requested_count,
+        returned_count,
+    ):
         del provider_id, symbol, interval
         self.coverage_updates += 1
         self.coverage = end_at
+        self.requested_count = requested_count
+        self.returned_count = returned_count
 
 
 class Provider:
@@ -179,3 +205,31 @@ def test_full_but_stale_cache_fetches_missing_tail_and_advances_watermark() -> N
     assert (
         result.dataset.series_by_symbol["IREN.US"].candles[-1].timestamp > old_candles[-1].timestamp
     )
+
+
+def test_authoritative_short_history_is_reused_on_second_identical_request() -> None:
+    """A newly listed security may legitimately have fewer bars than requested."""
+
+    target = NOW + timedelta(days=1)
+    cache = MemoryCache(())
+    provider = Provider(_candles(635))
+    service = CachedCandleService(SharedMarketDataService(provider), cache, "virtual")
+
+    first = service.get(
+        ("NEW.US",),
+        CandleInterval.DAY,
+        650,
+        target,
+        operation_control=_control(),
+    )
+    second = service.get(
+        ("NEW.US",),
+        CandleInterval.DAY,
+        650,
+        target,
+        operation_control=_control(),
+    )
+
+    assert len(first.dataset.series_by_symbol["NEW.US"].candles) == 635
+    assert provider.calls == 1
+    assert second.stats.cache_hits == 1

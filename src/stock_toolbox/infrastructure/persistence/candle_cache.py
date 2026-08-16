@@ -5,6 +5,7 @@ from __future__ import annotations
 from collections.abc import Callable
 from datetime import datetime
 
+from stock_toolbox.core.market_data.cache import CandleRequestCoverage
 from stock_toolbox.core.market_data.models import (
     CandleInterval,
     CandleSeries,
@@ -125,10 +126,20 @@ class SQLiteCandleCache:
         symbol: str,
         interval: CandleInterval,
     ) -> datetime | None:
+        coverage = self.request_coverage(provider_id, symbol, interval)
+        return coverage.covered_through if coverage is not None else None
+
+    def request_coverage(
+        self,
+        provider_id: str,
+        symbol: str,
+        interval: CandleInterval,
+    ) -> CandleRequestCoverage | None:
         connection = self._factory.open_reader()
         try:
             row = connection.execute(
-                "SELECT covered_through_utc FROM market_candle_coverage "
+                "SELECT covered_through_utc,requested_count,returned_count "
+                "FROM market_candle_coverage "
                 "WHERE provider_id=? AND symbol=? AND interval=? "
                 "AND adjustment='forward' AND regular_session=1",
                 (
@@ -141,7 +152,11 @@ class SQLiteCandleCache:
             connection.close()
         if row is None:
             return None
-        return parse_canonical_instant(row["covered_through_utc"])
+        return CandleRequestCoverage(
+            parse_canonical_instant(row["covered_through_utc"]),
+            int(row["requested_count"]),
+            int(row["returned_count"]),
+        )
 
     def mark_covered_through(
         self,
@@ -149,11 +164,16 @@ class SQLiteCandleCache:
         symbol: str,
         interval: CandleInterval,
         end_at: datetime,
+        *,
+        requested_count: int,
+        returned_count: int,
     ) -> None:
         provider = provider_id.strip()
         normalized_symbol = symbol.strip().upper()
         if not provider or not normalized_symbol:
             raise ValueError("provider id and symbol must not be blank")
+        if requested_count <= 0 or returned_count < 0:
+            raise ValueError("coverage counts are invalid")
         cached_at = canonical_instant(self._clock())
         connection = self._factory.open_writer()
         try:
@@ -161,13 +181,23 @@ class SQLiteCandleCache:
             connection.execute(
                 "INSERT INTO market_candle_coverage("
                 "provider_id,symbol,interval,adjustment,regular_session,"
-                "covered_through_utc,cached_at_utc"
-                ") VALUES (?,?,?,'forward',1,?,?) "
+                "covered_through_utc,cached_at_utc,requested_count,returned_count"
+                ") VALUES (?,?,?,'forward',1,?,?,?,?) "
                 "ON CONFLICT(provider_id,symbol,interval,adjustment,regular_session) "
                 "DO UPDATE SET "
                 "covered_through_utc=MAX("
                 "market_candle_coverage.covered_through_utc,"
                 "excluded.covered_through_utc),"
+                "requested_count=CASE WHEN excluded.covered_through_utc > "
+                "market_candle_coverage.covered_through_utc OR ("
+                "excluded.covered_through_utc = market_candle_coverage.covered_through_utc "
+                "AND excluded.requested_count >= market_candle_coverage.requested_count) "
+                "THEN excluded.requested_count ELSE market_candle_coverage.requested_count END,"
+                "returned_count=CASE WHEN excluded.covered_through_utc > "
+                "market_candle_coverage.covered_through_utc OR ("
+                "excluded.covered_through_utc = market_candle_coverage.covered_through_utc "
+                "AND excluded.requested_count >= market_candle_coverage.requested_count) "
+                "THEN excluded.returned_count ELSE market_candle_coverage.returned_count END,"
                 "cached_at_utc=excluded.cached_at_utc",
                 (
                     provider,
@@ -175,6 +205,8 @@ class SQLiteCandleCache:
                     interval.value,
                     canonical_instant(end_at),
                     cached_at,
+                    requested_count,
+                    returned_count,
                 ),
             )
             connection.commit()

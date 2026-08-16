@@ -109,6 +109,8 @@ def test_cache_persists_completed_bar_coverage_watermark(tmp_path: Path) -> None
         "IREN.US",
         CandleInterval.DAY,
         target,
+        requested_count=650,
+        returned_count=635,
     )
 
     assert (
@@ -119,3 +121,38 @@ def test_cache_persists_completed_bar_coverage_watermark(tmp_path: Path) -> None
         )
         == target
     )
+    coverage = cache.request_coverage(
+        "longbridge", "IREN.US", CandleInterval.DAY
+    )
+    assert coverage is not None
+    assert coverage.requested_count == 650
+    assert coverage.returned_count == 635
+
+
+def test_same_watermark_keeps_the_largest_authoritative_request(tmp_path: Path) -> None:
+    cache = _cache(tmp_path)
+    target = NOW + timedelta(days=3)
+    cache.mark_covered_through(
+        "longbridge",
+        "IREN.US",
+        CandleInterval.DAY,
+        target,
+        requested_count=650,
+        returned_count=635,
+    )
+
+    cache.mark_covered_through(
+        "longbridge",
+        "IREN.US",
+        CandleInterval.DAY,
+        target,
+        requested_count=220,
+        returned_count=220,
+    )
+
+    coverage = cache.request_coverage(
+        "longbridge", "IREN.US", CandleInterval.DAY
+    )
+    assert coverage is not None
+    assert coverage.requested_count == 650
+    assert coverage.returned_count == 635

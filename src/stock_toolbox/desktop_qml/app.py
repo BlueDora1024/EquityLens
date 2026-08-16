@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import cast
 
-from PySide6.QtCore import QCoreApplication, QProcess, QUrl
+from PySide6.QtCore import QCoreApplication, QProcess, Qt, QUrl
 from PySide6.QtGui import QFont, QGuiApplication, QWindow
 from PySide6.QtQml import QQmlApplicationEngine
 from PySide6.QtQuickControls2 import QQuickStyle
@@ -122,7 +122,14 @@ def build_pilot_engine(
         active_operations=lambda: len(
             application.registry.active_snapshots()
         ),
+        application_active=lambda: (
+            qt_application.applicationState()
+            == Qt.ApplicationState.ApplicationActive
+        ),
         parent=engine,
+    )
+    qt_application.applicationStateChanged.connect(
+        lambda _state: stall_monitor.reset_clock()
     )
     stall_monitor.start()
     qt_application.aboutToQuit.connect(stall_monitor.stop)

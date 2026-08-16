@@ -226,18 +226,20 @@ Item {
             clip: true
 
             Rectangle {
-                anchors.left: parent.left
-                anchors.top: parent.top
-                anchors.bottom: parent.bottom
-                width: parent.width * Math.max(
-                    0, Math.min(1, card.progress))
+                anchors.fill: parent
                 radius: 2
                 color: card.toneColor
+                transformOrigin: Item.Left
+                transform: Scale {
+                    origin.x: 0
+                    origin.y: 1.5
+                    xScale: Math.max(0, Math.min(1, card.progress))
 
-                Behavior on width {
-                    NumberAnimation {
-                        duration: 240
-                        easing.type: Easing.OutCubic
+                    Behavior on xScale {
+                        NumberAnimation {
+                            duration: 220
+                            easing.type: Easing.OutCubic
+                        }
                     }
                 }
             }

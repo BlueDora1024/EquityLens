@@ -228,6 +228,10 @@ ApplicationWindow {
                 // qmllint disable unqualified
                 visible: shellBridge.current_page === "rs_strength.run"
                 // qmllint enable unqualified
+                opacity: visible ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                }
                 onNetworkSettingsRequested: {
                     settingsPanel.focusNetworkSection()
                     window.settingsOpen = true
@@ -241,6 +245,10 @@ ApplicationWindow {
                 visible: ["securities", "classifications", "watchlists"]
                     .includes(shellBridge.current_page)
                 // qmllint enable unqualified
+                opacity: visible ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                }
                 onImportRequested: window.importOpen = true
             }
 
@@ -250,6 +258,10 @@ ApplicationWindow {
                 // qmllint disable unqualified
                 visible: shellBridge.current_page === "rs_strength.history"
                 // qmllint enable unqualified
+                opacity: visible ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                }
             }
 
             TurningPointPage {
@@ -258,6 +270,10 @@ ApplicationWindow {
                 // qmllint disable unqualified
                 visible: shellBridge.current_page.startsWith("turning_point.")
                 // qmllint enable unqualified
+                opacity: visible ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                }
                 onNetworkSettingsRequested: {
                     settingsPanel.focusNetworkSection()
                     window.settingsOpen = true
@@ -271,6 +287,10 @@ ApplicationWindow {
                 visible: shellBridge.current_page
                     .startsWith("extreme_deviation.")
                 // qmllint enable unqualified
+                opacity: visible ? 1 : 0
+                Behavior on opacity {
+                    NumberAnimation { duration: 140; easing.type: Easing.OutCubic }
+                }
                 onNetworkSettingsRequested: {
                     settingsPanel.focusNetworkSection()
                     window.settingsOpen = true

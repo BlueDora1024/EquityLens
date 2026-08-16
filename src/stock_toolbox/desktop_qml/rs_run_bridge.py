@@ -56,6 +56,7 @@ from stock_toolbox.desktop_qml.failure_presentation import (
 )
 from stock_toolbox.desktop_qml.fallback_consent import FallbackConsentGate
 from stock_toolbox.desktop_qml.progress_diagnostics import emit_progress
+from stock_toolbox.desktop_qml.progress_state import monotonic_stage_progress
 from stock_toolbox.runtime.environment import RuntimeEnvironment
 
 _RANGES = (
@@ -978,8 +979,13 @@ class RsRunBridge(QObject):
 
     def _apply_progress(self, raw: RunProgress) -> None:
         self._active_stage = _STAGES.index(raw.stage)
-        stage_fraction = raw.completed / raw.total if raw.total else 0.0
-        self._progress = (self._active_stage + stage_fraction) / len(_STAGES)
+        self._progress = monotonic_stage_progress(
+            self._progress,
+            stage_index=self._active_stage,
+            stage_count=len(_STAGES),
+            completed=raw.completed,
+            total=raw.total,
+        )
         self._stage_label, self._stage_detail = _STAGE_PRESENTATION[raw.stage]
         self._completed_count = raw.completed
         self._total_count = raw.total

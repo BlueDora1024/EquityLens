@@ -15,11 +15,11 @@ Button {
         label.implicitWidth + 30 + (busy ? 22 : 0))
     hoverEnabled: true
     transformOrigin: Item.Center
-    scale: control.down ? 0.97 : 1
+    scale: control.down ? 0.985 : 1
 
     Behavior on scale {
         NumberAnimation {
-            duration: 120
+            duration: 100
             easing.type: Easing.OutCubic
         }
     }

@@ -313,8 +313,9 @@ Item {
             objectName: "extremeProgressPanel"
             Layout.fillWidth: true
             Layout.fillHeight: false
-            Layout.preferredHeight: view.showLiveStatus ? 246 : 64
-            Layout.maximumHeight: view.showLiveStatus ? 246 : 64
+            Layout.preferredHeight: view.showLiveStatus ? 220 : 72
+            Layout.maximumHeight: view.showLiveStatus ? 220 : 72
+            clip: true
 
             ColumnLayout {
                 anchors.fill: parent
@@ -377,27 +378,13 @@ Item {
                     }
                 }
 
-                Rectangle {
+                SmoothProgressBar {
                     visible: outcomeCard.present
                     Layout.fillWidth: true
                     Layout.preferredHeight: 7
-                    radius: 4
-                    color: Theme.field
-
-                    Rectangle {
-                        height: parent.height
-                        radius: parent.radius
-                        color: Theme.accent
-                        // qmllint disable unqualified
-                        width: parent.width * extremeDeviationBridge.progress
-                        // qmllint enable unqualified
-                        Behavior on width {
-                            NumberAnimation {
-                                duration: 260
-                                easing.type: Easing.OutCubic
-                            }
-                        }
-                    }
+                    // qmllint disable unqualified
+                    progress: extremeDeviationBridge.progress
+                    // qmllint enable unqualified
                 }
 
                 StageStrip {

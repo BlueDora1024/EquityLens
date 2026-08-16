@@ -7,7 +7,7 @@ import re
 import uuid
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
-from typing import cast
+from typing import Any, cast
 
 from PySide6.QtCore import (
     Property,
@@ -166,6 +166,21 @@ class MasterDataBridge(QObject):
         self._refresh_status = ""
         self._refresh_summary: dict[str, int] = {}
         self._refresh_details: list[dict[str, str]] = []
+        self._securities_cache: tuple[Any, ...] = ()
+        self._classifications_cache: tuple[Any, ...] = ()
+        self._watchlists_cache: tuple[Any, ...] = ()
+        self._reload_master_data()
+
+    def _reload_master_data(self) -> None:
+        self._securities_cache = tuple(
+            self._application.master_data.list_securities()
+        )
+        self._classifications_cache = tuple(
+            self._application.master_data.list_classifications()
+        )
+        self._watchlists_cache = tuple(
+            self._application.master_data.list_watchlists()
+        )
 
     @Property(list, notify=changed)
     def securities(self) -> list[dict[str, object]]:
@@ -174,7 +189,7 @@ class MasterDataBridge(QObject):
     def _security_rows(self, search: str = "") -> list[dict[str, object]]:
         query = search.casefold().strip()
         rows: list[dict[str, object]] = []
-        for security in self._application.master_data.list_securities():
+        for security in self._securities_cache:
             display_symbol = security.canonical_symbol.removesuffix(".US")
             searchable = f"{display_symbol} {security.display_name}".casefold()
             if query and query not in searchable:
@@ -239,6 +254,12 @@ class MasterDataBridge(QObject):
 
     @Property(list, notify=changed)
     def classifications(self) -> list[dict[str, object]]:
+        member_counts: dict[str, int] = {}
+        for security in self._securities_cache:
+            for binding in security.bindings:
+                member_counts[binding.classification_id] = (
+                    member_counts.get(binding.classification_id, 0) + 1
+                )
         return [
             {
                 "id": item.id,
@@ -248,11 +269,9 @@ class MasterDataBridge(QObject):
                 ),
                 "origin": item.origin,
                 "aliases": list(item.aliases),
-                "memberCount": self._application.master_data.classification_usage(
-                    item.id
-                )[0],
+                "memberCount": member_counts.get(item.id, 0),
             }
-            for item in self._application.master_data.list_classifications()
+            for item in self._classifications_cache
         ]
 
     @Property(list, notify=changed)
@@ -309,7 +328,7 @@ class MasterDataBridge(QObject):
                 "name": item.display_name,
                 "memberCount": len(item.memberships),
             }
-            for item in self._application.master_data.list_watchlists()
+            for item in self._watchlists_cache
         ]
 
     @Property(str, notify=changed)
@@ -320,15 +339,19 @@ class MasterDataBridge(QObject):
     def selected_watchlist_members(self) -> list[dict[str, object]]:
         if not self._selected_watchlist_id:
             return []
-        try:
-            watchlist = self._application.master_data.get_watchlist(
-                self._selected_watchlist_id
-            )
-        except KeyError:
+        watchlist = next(
+            (
+                item
+                for item in self._watchlists_cache
+                if item.id == self._selected_watchlist_id
+            ),
+            None,
+        )
+        if watchlist is None:
             return []
         securities = {
             item.id: item
-            for item in self._application.master_data.list_securities()
+            for item in self._securities_cache
         }
         return [
             {
@@ -358,11 +381,15 @@ class MasterDataBridge(QObject):
     def watchlist_candidates(self) -> list[dict[str, object]]:
         if not self._selected_watchlist_id:
             return []
-        try:
-            watchlist = self._application.master_data.get_watchlist(
-                self._selected_watchlist_id
-            )
-        except KeyError:
+        watchlist = next(
+            (
+                item
+                for item in self._watchlists_cache
+                if item.id == self._selected_watchlist_id
+            ),
+            None,
+        )
+        if watchlist is None:
             return []
         existing = {item.security_id for item in watchlist.memberships}
         return [
@@ -692,6 +719,7 @@ class MasterDataBridge(QObject):
             self.changed.emit()
             return False
         self._status = "分类已创建。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -785,6 +813,7 @@ class MasterDataBridge(QObject):
             f"批量添加完成 · 成功 {summary['added']} · "
             f"已存在 {summary['existing']} · 失败 {summary['failed']}"
         )
+        self._reload_master_data()
         self.changed.emit()
         return dict(self._classification_batch_result)
 
@@ -804,6 +833,7 @@ class MasterDataBridge(QObject):
             self.changed.emit()
             return False
         self._status = "分类已重命名。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -818,6 +848,7 @@ class MasterDataBridge(QObject):
             self.changed.emit()
             return False
         self._status = "分类已删除。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -838,6 +869,7 @@ class MasterDataBridge(QObject):
             self.changed.emit()
             return False
         self._status = "证券分类已更新。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -910,6 +942,7 @@ class MasterDataBridge(QObject):
             self.changed.emit()
             return False
         self._status = "标签已移除；相关股票池已按剩余标签同步。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -922,6 +955,7 @@ class MasterDataBridge(QObject):
             self.changed.emit()
             return False
         self._status = "证券及其股票池成员关系已删除。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -961,6 +995,7 @@ class MasterDataBridge(QObject):
             return ""
         self._selected_watchlist_id = watchlist.id
         self._status = "股票池已创建。"
+        self._reload_master_data()
         self.changed.emit()
         return watchlist.id
 
@@ -982,6 +1017,7 @@ class MasterDataBridge(QObject):
             self.changed.emit()
             return False
         self._status = "股票池已重命名。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -996,6 +1032,7 @@ class MasterDataBridge(QObject):
         if self._selected_watchlist_id == watchlist_id:
             self._selected_watchlist_id = ""
         self._status = "股票池已删除。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -1035,6 +1072,7 @@ class MasterDataBridge(QObject):
             return {"added": 0}
         self._selected_watchlist_id = watchlist_id
         self._status = f"已添加 {len(selections)} 只证券。"
+        self._reload_master_data()
         self.changed.emit()
         return {"added": len(selections)}
 
@@ -1056,6 +1094,7 @@ class MasterDataBridge(QObject):
             self.changed.emit()
             return False
         self._status = "参评标签已更新。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -1075,6 +1114,7 @@ class MasterDataBridge(QObject):
             self.changed.emit()
             return False
         self._status = "成员已从股票池移除。"
+        self._reload_master_data()
         self.changed.emit()
         return True
 
@@ -1281,6 +1321,7 @@ class MasterDataBridge(QObject):
         self._import_total = sum(self._import_summary.values())
         self._import_completed = self._import_total
         self._import_progress = 1.0
+        self._reload_master_data()
         self.import_changed.emit()
         self.changed.emit()
         self.import_finished.emit(raw)
@@ -1373,6 +1414,7 @@ class MasterDataBridge(QObject):
                 "failed": 1,
             }
             self._refresh_status = "更新失败，请检查供应商连接后重试。"
+        self._reload_master_data()
         self.refresh_changed.emit()
         self.changed.emit()
         self.refresh_finished.emit(raw)

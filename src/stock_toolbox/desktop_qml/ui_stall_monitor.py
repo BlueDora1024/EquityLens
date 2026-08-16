@@ -31,6 +31,7 @@ class UiStallMonitor(QObject):
         *,
         current_page: Callable[[], str],
         active_operations: Callable[[], int],
+        application_active: Callable[[], bool] = lambda: True,
         monotonic_ns: Callable[[], int] = time.monotonic_ns,
         interval_ms: int = 250,
         parent: QObject | None = None,
@@ -39,6 +40,7 @@ class UiStallMonitor(QObject):
         self._diagnostics = diagnostics
         self._current_page = current_page
         self._active_operations = active_operations
+        self._application_active = application_active
         self._monotonic_ns = monotonic_ns
         self._interval_ms = interval_ms
         self._expected_ns = 0
@@ -59,6 +61,9 @@ class UiStallMonitor(QObject):
         )
 
     def observe_heartbeat(self) -> None:
+        if not self._application_active():
+            self.reset_clock()
+            return
         now_ns = self._monotonic_ns()
         delay_ms = max(0, (now_ns - self._expected_ns) // 1_000_000)
         self._expected_ns = now_ns + self._interval_ms * 1_000_000

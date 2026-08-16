@@ -19,6 +19,7 @@ from stock_toolbox.core.diagnostics.models import (
     DiagnosticStatus,
 )
 from stock_toolbox.desktop_qml.app import build_pilot_engine
+from stock_toolbox.desktop_qml.window_activation import WindowActivationController
 from stock_toolbox.runtime.environment import RuntimeEnvironment
 
 _ENVIRONMENT_ALIASES = {
@@ -97,6 +98,9 @@ def main(argv: Sequence[str] | None = None) -> int:
     engine = build_pilot_engine(core, environment)
     window = cast(QWindow, engine.rootObjects()[0])
     window.show()
+    activation = WindowActivationController(window, engine)
+    qt_application.applicationStateChanged.connect(activation.restore_if_active)
+    window.requestActivate()
     _record_lifecycle(core, "ready")
     return qt_application.exec()
 

@@ -519,7 +519,7 @@ def _capture(output: Path, *, width: int = 1280, height: int = 800) -> None:
             window.setProperty("settingsOpen", True)
             settings.select_page("provider")
             settings.select_provider("longbridge")
-            QTest.qWait(100)
+            QTest.qWait(220)
             save_window(window, output / f"settings-provider-{mode}.png")
             settings.select_provider("futu")
             QTest.qWait(240)
@@ -552,7 +552,8 @@ def _capture(output: Path, *, width: int = 1280, height: int = 800) -> None:
             save_window(window, output / f"settings-advanced-{mode}.png")
             window.setProperty("settingsOpen", False)
             window.setProperty("importOpen", True)
-            QTest.qWait(100)
+            # Let the modal fade/scale transition settle before taking evidence.
+            QTest.qWait(220)
             save_window(window, output / f"import-{mode}.png")
             window.setProperty("importOpen", False)
 
@@ -669,7 +670,7 @@ def _capture(output: Path, *, width: int = 1280, height: int = 800) -> None:
                 save_state("resilience-yahoo-unavailable-light.png")
 
             window.setProperty("scenarioOpen", True)
-            QTest.qWait(100)
+            QTest.qWait(220)
             save_window(window, output / f"scenario-lab-{mode}.png")
             window.setProperty("scenarioOpen", False)
         window.close()

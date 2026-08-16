@@ -133,6 +133,39 @@ def test_open_futu_opend_uses_local_gui_boundary(tmp_path: Path) -> None:
     assert opend.opened == 1
 
 
+def test_startup_does_not_construct_futu_sdk_when_opend_is_offline(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    opend = OpenD(FutuOpenDStatus(True, False, "futu_opend_not_running"))
+    initial = build_application(
+        RuntimeEnvironment.DEVELOPMENT,
+        home=tmp_path,
+        futu_opend_override=opend,
+    )
+    initial._settings_store.save_provider_candidate("futu", configured=True)
+    initial._settings_store.activate_provider("futu")
+    initial.close()
+    constructed = False
+
+    def construct_futu(_settings):
+        nonlocal constructed
+        constructed = True
+        return FutuCandidate()
+
+    monkeypatch.setattr(composition, "_futu_provider", construct_futu)
+
+    restarted = build_application(
+        RuntimeEnvironment.DEVELOPMENT,
+        home=tmp_path,
+        futu_opend_override=opend,
+    )
+
+    assert constructed is False
+    assert restarted.provider_identity() == ProviderIdentity("futu", "富途", True)
+    restarted.close()
+
+
 def test_futu_quality_sanitizes_unknown_provider_errors(
     tmp_path: Path,
     monkeypatch,
@@ -151,3 +184,24 @@ def test_futu_quality_sanitizes_unknown_provider_errors(
     assert result.code == "PROVIDER_TRADING_DAY_FAILED"
     assert result.details == ("opend",)
     assert "Bearer" not in repr(result)
+
+
+def test_futu_quality_preserves_known_provider_failure_reason(
+    tmp_path: Path,
+    monkeypatch,
+) -> None:
+    opend = OpenD(FutuOpenDStatus(True, True, "futu_opend_port_ready"))
+    application = active_longbridge_application(tmp_path, opend)
+    monkeypatch.setattr(
+        composition,
+        "_futu_provider",
+        lambda _settings: FutuCandidate(
+            bar_errors={"AAPL.US": "permission_denied"},
+        ),
+    )
+
+    result = application.quality_futu()
+
+    assert result.ok is False
+    assert result.code == "permission_denied"
+    assert result.details == ("opend", "trading_day", "company_profile")

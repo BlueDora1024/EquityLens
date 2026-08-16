@@ -9,10 +9,17 @@ import "components"
 Rectangle {
     id: overlay
     objectName: "importOverlay"
+    // Keep modal content above pages while preserving native title-bar controls.
+    z: 50
     signal closeRequested
     property string detailFilter: ""
     property bool filePreviewApplied: false
     property bool importLaunchPending: false
+
+    opacity: visible ? 1 : 0
+    Behavior on opacity {
+        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+    }
 
     function finishAndClear(): void {
         // qmllint disable unqualified
@@ -80,10 +87,14 @@ Rectangle {
     MouseArea { anchors.fill: parent }
 
     GlassPanel {
-        width: 780
-        height: 650
+        width: Math.min(780, overlay.width - 48)
+        height: Math.min(650, overlay.height - 48)
         anchors.centerIn: parent
         color: Theme.dark ? "#F021242A" : "#FFF8F7F4"
+        scale: overlay.visible ? 1 : 0.985
+        Behavior on scale {
+            NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
+        }
 
         ColumnLayout {
             anchors.fill: parent

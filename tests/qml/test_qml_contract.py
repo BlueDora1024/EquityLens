@@ -54,7 +54,7 @@ def test_shared_controls_use_restrained_pointer_feedback() -> None:
     button = qml_text("components/GlassButton.qml")
     info_tip = qml_text("components/InfoTip.qml")
 
-    assert "scale: control.down ? 0.97 : 1" in button
+    assert "scale: control.down ? 0.985 : 1" in button
     assert "Behavior on scale" in button
     assert "duration: 120" in button
     assert "delay: 180" in info_tip
@@ -628,8 +628,8 @@ def test_extreme_progress_panel_stays_compact_in_idle_and_running_states() -> No
 
     assert 'objectName: "extremeProgressPanel"' in source
     assert "Layout.fillHeight: false" in source
-    assert "Layout.preferredHeight: view.showLiveStatus ? 246 : 64" in source
-    assert "Layout.maximumHeight: view.showLiveStatus ? 246 : 64" in source
+    assert "Layout.preferredHeight: view.showLiveStatus ? 220 : 72" in source
+    assert "Layout.maximumHeight: view.showLiveStatus ? 220 : 72" in source
     assert 'objectName: "extremeIdleSpacer"' in source
     assert "Layout.fillHeight: true" in source
     assert "visible: !view.showLiveStatus" not in source

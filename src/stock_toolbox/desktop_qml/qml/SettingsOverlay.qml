@@ -9,6 +9,7 @@ import "components"
 Rectangle {
     id: overlay
     objectName: "settingsOverlay"
+    z: 50
 
     signal closeRequested
     signal onboardingCompleted
@@ -23,6 +24,10 @@ Rectangle {
     // qmllint enable unqualified
 
     color: Theme.modalScrim
+    opacity: visible ? 1 : 0
+    Behavior on opacity {
+        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+    }
 
     FileDialog {
         id: diagnosticExportDialog
@@ -108,6 +113,10 @@ Rectangle {
     }
 
     GlassPanel {
+        scale: overlay.visible ? 1 : 0.985
+        Behavior on scale {
+            NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
+        }
         width: overlay.firstRunMode
             ? overlay.width
             : Math.min(1040, overlay.width - 48)

@@ -58,6 +58,10 @@ FocusScope {
 
     anchors.fill: parent
     z: 2300
+    opacity: visible ? 1 : 0
+    Behavior on opacity {
+        NumberAnimation { duration: 160; easing.type: Easing.OutCubic }
+    }
     activeFocusOnTab: true
     Accessible.role: Accessible.Dialog
     Accessible.name: "使用引导"
@@ -100,6 +104,10 @@ FocusScope {
         color: Theme.overlayPanel
         border.width: 1
         border.color: Theme.hairline
+        scale: overlay.visible ? 1 : 0.985
+        Behavior on scale {
+            NumberAnimation { duration: 180; easing.type: Easing.OutCubic }
+        }
 
         ColumnLayout {
             anchors.fill: parent
@@ -418,10 +426,6 @@ FocusScope {
                         border.color: Theme.accentSoft
                     }
 
-                    Behavior on x { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    Behavior on y { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    Behavior on width { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
-                    Behavior on height { NumberAnimation { duration: 180; easing.type: Easing.OutCubic } }
                 }
             }
 

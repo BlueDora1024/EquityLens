@@ -967,6 +967,15 @@ class SettingsBridge(QObject):
                 "futu_opend_not_installed": "opend",
                 "futu_opend_not_running": "opend",
             }.get(code)
+            if failed_check is None:
+                failed_check = next(
+                    (
+                        check_id
+                        for check_id, _label in self._selected_provider_checks()
+                        if check_id not in completed
+                    ),
+                    None,
+                )
             for check_id, _label in self._selected_provider_checks():
                 self._provider_check_states[check_id] = (
                     "passed"
@@ -984,6 +993,16 @@ class SettingsBridge(QObject):
                 "PROVIDER_TIMEOUT": "质检超时，请确认 OpenD 保持登录后重试。",
                 "PROVIDER_FUTU_WORKER_FAILED": "质检进程异常，请重新打开软件后重试。",
                 "PROVIDER_FUTU_FAILED": "OpenD 返回了无法识别的错误。",
+                "futu_quote_not_logged_in": "OpenD 已连接，但行情账户尚未登录。",
+                "permission_denied": "当前富途账户没有读取这项行情的权限。",
+                "rate_limited": "请求过快，OpenD 暂时限制了行情读取。",
+                "quota_exhausted": "历史 K 线额度已用完。",
+                "timeout": "OpenD 响应超时，请稍后重试。",
+                "network_error": "OpenD 网络连接异常。",
+                "service_unavailable": "富途行情服务暂时不可用。",
+                "malformed_data": "OpenD 返回的数据格式不完整。",
+                "symbol_unavailable": "AAPL 行情暂时不可用。",
+                "security_delisted": "测试证券已停止上市。",
             }.get(code, f"错误代码 {code}。")
             self._status = (
                 f"富途质检未通过：{detail}"

@@ -53,3 +53,22 @@ def test_delayed_heartbeat_emits_page_operation_and_memory_evidence() -> None:
     assert event.duration_ms == 1_200
     assert event.details["page"] == "rs_strength.run"
     assert event.details["active_operations"] == 1
+
+
+def test_background_timer_coalescing_is_not_reported_as_ui_stall() -> None:
+    logger = _Logger()
+    ticks = iter((1_000_000_000, 21_250_000_000, 21_500_000_000))
+    active = False
+    monitor = UiStallMonitor(
+        logger,
+        current_page=lambda: "rs_strength.run",
+        active_operations=lambda: 0,
+        application_active=lambda: active,
+        monotonic_ns=lambda: next(ticks),
+        interval_ms=250,
+    )
+    monitor.reset_clock()
+
+    monitor.observe_heartbeat()
+
+    assert logger.events == []

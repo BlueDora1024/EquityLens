@@ -2442,6 +2442,23 @@ class StockToolboxApplication:
         return self._futu_opend.probe()
 
     def quality_futu(self) -> ServiceTestResult:
+        known_provider_codes = {
+            "futu_quote_not_logged_in",
+            "permission_denied",
+            "rate_limited",
+            "quota_exhausted",
+            "timeout",
+            "network_error",
+            "service_unavailable",
+            "malformed_data",
+            "symbol_unavailable",
+            "security_delisted",
+        }
+
+        def known_code(value: object, fallback: str) -> str:
+            candidate = str(value)
+            return candidate if candidate in known_provider_codes else fallback
+
         status = self._futu_opend.probe()
         if not status.port_open:
             return ServiceTestResult("provider", False, status.code)
@@ -2467,21 +2484,36 @@ class StockToolboxApplication:
                 operation_control=context.operation_control,
             )
             if day is None:
-                raise RuntimeError("PROVIDER_TRADING_DAY_FAILED")
+                raise RuntimeError(
+                    known_code(
+                        getattr(provider, "last_error_code", ""),
+                        "PROVIDER_TRADING_DAY_FAILED",
+                    )
+                )
             completed.append("trading_day")
             profiles = provider.get_security_profiles(
                 ("AAPL.US",),
                 operation_control=context.operation_control,
             )
             if not profiles.profiles:
-                raise RuntimeError("PROVIDER_PROFILE_FAILED")
+                raise RuntimeError(
+                    known_code(
+                        profiles.errors[0].code if profiles.errors else "",
+                        "PROVIDER_PROFILE_FAILED",
+                    )
+                )
             completed.append("company_profile")
             snapshots = provider.get_security_snapshots(
                 ("AAPL.US",),
                 operation_control=context.operation_control,
             )
             if "AAPL.US" not in snapshots.snapshots_by_symbol:
-                raise RuntimeError("PROVIDER_SNAPSHOT_FAILED")
+                raise RuntimeError(
+                    known_code(
+                        snapshots.errors.get("AAPL.US", ""),
+                        "PROVIDER_SNAPSHOT_FAILED",
+                    )
+                )
             completed.append("snapshot")
             bars = provider.get_daily_series(
                 ("AAPL.US",),
@@ -2491,7 +2523,12 @@ class StockToolboxApplication:
             )
             series = bars.series_by_symbol.get("AAPL.US")
             if series is None or not series.points:
-                raise RuntimeError("PROVIDER_DAILY_BARS_FAILED")
+                raise RuntimeError(
+                    known_code(
+                        bars.errors.get("AAPL.US", ""),
+                        "PROVIDER_DAILY_BARS_FAILED",
+                    )
+                )
             completed.append("daily_bars")
             quota_reader = getattr(provider, "get_history_quota", None)
             if not callable(quota_reader):
@@ -2508,6 +2545,7 @@ class StockToolboxApplication:
                 "PROVIDER_SNAPSHOT_FAILED",
                 "PROVIDER_DAILY_BARS_FAILED",
                 "PROVIDER_QUOTA_FAILED",
+                *known_provider_codes,
             }:
                 code = str(exception)
             elif completed:
@@ -3073,10 +3111,14 @@ def build_application(
             )
         elif settings.provider_mode == "futu":
             if settings.provider_configured:
-                try:
-                    provider = _futu_provider(settings)
-                except Exception:  # noqa: BLE001 - disconnected OpenD is recoverable
+                opend_status = futu_opend.probe()
+                if not opend_status.port_open:
                     provider = UnavailableProvider("futu", "富途")
+                else:
+                    try:
+                        provider = _futu_provider(settings)
+                    except Exception:  # noqa: BLE001 - disconnected OpenD is recoverable
+                        provider = UnavailableProvider("futu", "富途")
             else:
                 provider = UnavailableProvider("futu", "富途")
         else:

@@ -8,9 +8,15 @@ import "components"
 Rectangle {
     id: overlay
     objectName: "scenarioLabOverlay"
+    z: 50
 
     signal closeRequested
     property string selectedScenarioId: ""
+
+    opacity: visible ? 1 : 0
+    Behavior on opacity {
+        NumberAnimation { duration: 150; easing.type: Easing.OutCubic }
+    }
 
     color: Theme.modalScrim
     MouseArea { anchors.fill: parent }
@@ -20,6 +26,10 @@ Rectangle {
         height: Math.min(590, overlay.height - 70)
         anchors.centerIn: parent
         color: Theme.dark ? "#F021242A" : "#FAF5F4F1"
+        scale: overlay.visible ? 1 : 0.985
+        Behavior on scale {
+            NumberAnimation { duration: 170; easing.type: Easing.OutCubic }
+        }
 
         ColumnLayout {
             anchors.fill: parent

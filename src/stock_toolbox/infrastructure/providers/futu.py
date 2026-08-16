@@ -227,6 +227,11 @@ class FutuProvider:
         self._history_quota_snapshot: HistoryQuotaSnapshot | None = None
         self._history_quota_authorized: set[str] = set()
         self._history_breaker = CircuitBreaker()
+        self._last_error_code = ""
+
+    @property
+    def last_error_code(self) -> str:
+        return self._last_error_code
 
     def close(self) -> None:
         close = getattr(self._quote, "close", None)
@@ -255,6 +260,7 @@ class FutuProvider:
                 end=candidate.isoformat(),
             )
             if ret != _SUCCESS:
+                self._last_error_code = _error_code(raw)
                 return None
             days = tuple(
                 date.fromisoformat(str(row.get("time", "")))
@@ -262,8 +268,10 @@ class FutuProvider:
                 if str(row.get("time", ""))
             )
         except (TypeError, ValueError):
+            self._last_error_code = "malformed_data"
             return None
         eligible = tuple(day for day in days if day <= candidate)
+        self._last_error_code = "" if eligible else "symbol_unavailable"
         return max(eligible) if eligible else None
 
     def get_security_profiles(

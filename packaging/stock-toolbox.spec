@@ -98,7 +98,7 @@ application = BUNDLE(
         "CFBundleDisplayName": "EquityLens",
         "CFBundleName": "EquityLens",
         "CFBundleShortVersionString": VERSION,
-        "CFBundleVersion": "29",
+        "CFBundleVersion": "30",
         "EquityLensReleaseTag": RELEASE_TAG,
         "EquityLensGitSHA": GIT_SHA,
         "EquityLensArchitecture": TARGET_ARCH,

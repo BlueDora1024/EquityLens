@@ -67,6 +67,7 @@ from stock_toolbox.desktop_qml.progress_diagnostics import (
     ProgressEventSampler,
     emit_progress,
 )
+from stock_toolbox.desktop_qml.progress_state import monotonic_stage_progress
 from stock_toolbox.desktop_qml.report_operation import (
     execute_report_operation,
     reserve_report_operation,
@@ -1100,9 +1101,15 @@ class ExtremeDeviationBridge(QObject):
         stage = "FETCH_CANDLES" if raw.stage == "FETCH_FALLBACK" else raw.stage
         if stage not in _STAGES:
             return
-        self._active_stage = _STAGES.index(stage)
-        fraction = raw.completed / raw.total if raw.total else 0.0
-        self._progress = (self._active_stage + fraction) / len(_STAGES)
+        stage_index = _STAGES.index(stage)
+        self._active_stage = max(self._active_stage, stage_index)
+        self._progress = monotonic_stage_progress(
+            self._progress,
+            stage_index=stage_index,
+            stage_count=len(_STAGES),
+            completed=raw.completed,
+            total=raw.total,
+        )
         self._cache_hits = raw.cache_hits
         self._fetched = raw.fetched
         self._failures = raw.failures

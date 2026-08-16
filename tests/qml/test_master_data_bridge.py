@@ -139,6 +139,50 @@ def test_master_data_bridge_sorts_and_filters_global_securities(
     assert [item["symbol"] for item in bridge.securities] == ["IREN.US"]
 
 
+def test_master_data_properties_reuse_one_loaded_snapshot(
+    scenario_application,
+    monkeypatch,
+) -> None:
+    seeded_watchlist(scenario_application)
+    bridge = MasterDataBridge(scenario_application)
+    watchlist_id = str(bridge.watchlists[0]["id"])
+    classification_id = str(bridge.classifications[0]["id"])
+
+    def unexpected_read(*_args, **_kwargs):
+        raise AssertionError("QML property binding repeated a database read")
+
+    monkeypatch.setattr(
+        scenario_application.master_data,
+        "list_securities",
+        unexpected_read,
+    )
+    monkeypatch.setattr(
+        scenario_application.master_data,
+        "list_classifications",
+        unexpected_read,
+    )
+    monkeypatch.setattr(
+        scenario_application.master_data,
+        "list_watchlists",
+        unexpected_read,
+    )
+    monkeypatch.setattr(
+        scenario_application.master_data,
+        "get_watchlist",
+        unexpected_read,
+    )
+
+    bridge.select_watchlist(watchlist_id)
+    bridge.select_classification(classification_id)
+
+    assert bridge.securities
+    assert bridge.classifications
+    assert bridge.watchlists
+    assert bridge.selected_watchlist_members
+    assert isinstance(bridge.watchlist_candidates, list)
+    assert isinstance(bridge.classification_members, list)
+
+
 def test_master_data_bridge_projects_user_facing_symbol_number_and_details(
     scenario_application,
 ) -> None:
